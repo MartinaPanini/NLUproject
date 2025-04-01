@@ -58,24 +58,24 @@ def collate_fn(data, pad_token):
     return new_item
 
 # Funzione per plottare le loss
-def plot_loss(sampled_epochs, losses_train, losses_dev, save_path):
+def plot_loss(sampled_epochs, losses_train, losses_dev, save_path, model_name):
     plt.figure()
     plt.plot(sampled_epochs, losses_train, label='Train Loss')
     plt.plot(sampled_epochs, losses_dev, label='Validation Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.title('Training and Validation Loss')
+    plt.title(f'Training and Validation Loss {model_name}')
     plt.savefig(save_path)
     plt.close()
 
 # Funzione per plottare la Perplexity
-def plot_perplexity(sampled_epochs, perplexities, save_path):
+def plot_perplexity(sampled_epochs, perplexities, save_path, model_name):
     plt.figure()
     plt.plot(sampled_epochs, perplexities, label='Validation Perplexity')
     plt.xlabel('Epochs')
     plt.ylabel('Perplexity')
     plt.legend()
-    plt.title('Validation Perplexity')
+    plt.title(f'Validation Perplexity {model_name}')
     plt.savefig(save_path)
     plt.close()
