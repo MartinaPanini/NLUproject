@@ -30,32 +30,27 @@ if __name__ == "__main__":
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
 ####################################################################################################################################################################
-    # Experiment also with a smaller or bigger model by changing hid and emb sizes 
-    # A large model tends to overfit
-    hid_size = 200
-    emb_size = 300
-
-    # Don't forget to experiment with a lower training batch size
-    # Increasing the back propagation steps can be seen as a regularization step
-
-    # With SGD try with an higher learning rate (> 1 for instance)
-    lr = 0.0001 # This is definitely not good for SGD
-    clip = 5 # Clip the gradient
+    hid_size = 300
+    emb_size = 500
+    lr = 0.0001 
+    clip = 5
+    n_epochs = 100
+    patience = 5
+    batch_train = 32
+    batch_dev_test = 64
 ####################################################################################################################################################################
     vocab_len = len(lang.word2id)
 
-   #model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-    model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    #model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    #model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    model = LM_LSTM_DROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
     model.apply(init_weights)
 
-    optimizer = optim.SGD(model.parameters(), lr=lr)
+    #optimizer = optim.SGD(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion_train = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"])
     criterion_eval = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"], reduction='sum')
 
-####################################################################################################################################################################
-    n_epochs = 10
-    patience = 3
-####################################################################################################################################################################
     losses_train = []
     losses_dev = []
     sampled_epochs = []
@@ -86,9 +81,8 @@ if __name__ == "__main__":
     print('Test ppl: ', final_ppl)
 
 # To save the model
-# path = 'model_bin/model_name.pt'
-# torch.save(model.state_dict(), path)
-# To load the model you need to initialize it
-# model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-# Then you load it
-# model.load_state_dict(torch.load(path))
+model_name = f'LSTM_DROPOUT_PPL_{final_ppl}_LR_{lr}'
+path = f'Results/{model_name}.pt'
+torch.save(model.state_dict(), path)
+model = LM_LSTM_DROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+model.load_state_dict(torch.load(path))
