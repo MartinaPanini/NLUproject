@@ -44,7 +44,8 @@ if __name__ == "__main__":
 ####################################################################################################################################################################
     vocab_len = len(lang.word2id)
 
-    model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+   #model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
     model.apply(init_weights)
 
     optimizer = optim.SGD(model.parameters(), lr=lr)
