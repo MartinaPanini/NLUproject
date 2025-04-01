@@ -1,0 +1,12 @@
+
+RNN_SGD_PPL_196.98_LR_3
+
+hid_size=100, 
+emb_size=300, 
+lr=3, 
+clip=5, 
+n_epochs=100, 
+patience=0, 
+batch_train=32, 
+batch_dev_test=128, 
+test_ppl=196.97638088530096

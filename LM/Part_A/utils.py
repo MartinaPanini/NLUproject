@@ -1,4 +1,5 @@
 import torch
+import matplotlib.pyplot as plt
 
 # Loading the corpus 
 def read_file(path, eos_token="<eos>"):
@@ -55,3 +56,26 @@ def collate_fn(data, pad_token):
     new_item["target"] = target.to(device)
     new_item["number_tokens"] = sum(lengths)
     return new_item
+
+# Funzione per plottare le loss
+def plot_loss(sampled_epochs, losses_train, losses_dev, save_path):
+    plt.figure()
+    plt.plot(sampled_epochs, losses_train, label='Train Loss')
+    plt.plot(sampled_epochs, losses_dev, label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title('Training and Validation Loss')
+    plt.savefig(save_path)
+    plt.close()
+
+# Funzione per plottare la Perplexity
+def plot_perplexity(sampled_epochs, perplexities, save_path):
+    plt.figure()
+    plt.plot(sampled_epochs, perplexities, label='Validation Perplexity')
+    plt.xlabel('Epochs')
+    plt.ylabel('Perplexity')
+    plt.legend()
+    plt.title('Validation Perplexity')
+    plt.savefig(save_path)
+    plt.close()
