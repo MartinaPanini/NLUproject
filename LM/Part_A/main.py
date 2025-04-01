@@ -32,9 +32,9 @@ if __name__ == "__main__":
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
 ####################################################################################################################################################################
-    hid_sizes = [100, 300]
-    emb_sizes = [300, 500]
-    lrs = [0.5, 3, 5]
+    hid_sizes = [100]
+    emb_sizes = [500]
+    lrs = [0.0001, 0.001, 0.1]
     clips = [5]
     n_epochs_list = [100]
     patience_list = [3]
@@ -50,8 +50,8 @@ if __name__ == "__main__":
         model = LM_LSTM_DROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
         model.apply(init_weights)
 
-        optimizer = optim.SGD(model.parameters(), lr=lr)
-        #optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+        #optimizer = optim.SGD(model.parameters(), lr=lr)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
         criterion_train = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"])
         criterion_eval = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"], reduction='sum')
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
         print('Test ppl: ', final_ppl)
 
-        model_name = f"LSTM_DROPOUT_SGD_PPL_{final_ppl:.2f}_LR_{lr}"  # Placeholder for final PPL
+        model_name = f"LSTM_DROPOUT_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  # Placeholder for final PPL
         result_path=os.path.join("Results", model_name)
         os.makedirs(result_path, exist_ok=True)
 
@@ -101,12 +101,12 @@ if __name__ == "__main__":
         loss_dir = os.path.dirname(os.path.join(result_path, "loss_plot.png"))
         os.makedirs(loss_dir, exist_ok=True)
         loss_path = os.path.join(result_path, "loss_plot.png")
-        plot_loss(sampled_epochs, losses_train, losses_dev, loss_path)
+        plot_loss(sampled_epochs, losses_train, losses_dev, loss_path, model_name=model_name)
         # Perplexity plot
         ppl_dir = os.path.dirname(os.path.join(result_path, "perplexity_plot.png"))
         os.makedirs(ppl_dir, exist_ok=True)
         ppl_path = os.path.join(result_path, "perplexity_plot.png")
-        plot_perplexity(sampled_epochs, perplexities, ppl_path)
+        plot_perplexity(sampled_epochs, perplexities, ppl_path, model_name=model_name)
 
         # To save the model
         path = os.path.join(result_path, f'{model_name}.pt')
