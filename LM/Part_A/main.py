@@ -33,8 +33,8 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
 ####################################################################################################################################################################
     hid_sizes = [100]
-    emb_sizes = [500]
-    lrs = [0.0001, 0.001, 0.1]
+    emb_sizes = [300]
+    lrs = [0.00001]
     clips = [5]
     n_epochs_list = [100]
     patience_list = [3]
