@@ -12,6 +12,7 @@ from tqdm import tqdm
 import itertools
 import os
 
+
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -28,30 +29,31 @@ if __name__ == "__main__":
     test_dataset = PennTreeBank(test_raw, lang)
 
     # Dataloader instantiation
-    train_loader = DataLoader(train_dataset, batch_size=32, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]),  shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=32, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]), shuffle=True)
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
-####################################################################################################################################################################
-    hid_sizes = [100]
-    emb_sizes = [300]
-    lrs = [0.001]
-    clips = [5]
-    n_epochs_list = [100]
-    patience_list = [3]
-    batch_train_list = [64]
-    batch_dev_test_list = [128]
-####################################################################################################################################################################
-    for hid_size, emb_size, lr, clip, n_epochs, patience, batch_train, batch_dev_test in itertools.product(
-                hid_sizes, emb_sizes, lrs, clips, n_epochs_list, patience_list, batch_train_list, batch_dev_test_list):
+
+    ####################################################################################################################################################################
+    hid_sizes = [100, 300]
+    emb_sizes = [300, 500]
+    lrs = [0.001, 0.0001] # for AdamW
+    #lrs = [0.1, 1, 3] # for SGD
+    batch_train_list = [32, 64]
+    batch_dev_test_list = [64, 128]
+    clip = 5
+    n_epochs = 100
+    patience = 3
+    ####################################################################################################################################################################
+    
+    for hid_size, emb_size, lr, batch_train, batch_dev_test in itertools.product(
+            hid_sizes, emb_sizes, lrs, batch_train_list, batch_dev_test_list):
         vocab_len = len(lang.word2id)
-        
+
         model = LM_LSTM_VarDROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-        # Inizializza solo l'embedding
         nn.init.xavier_uniform_(model.embedding.weight)
 
-        #optimizer = optim.SGD(model.parameters(), lr=lr)
+        #optimizer = torch.optim.SGD(model.parameters(), lr=lr, weight_decay=0.01)
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
-        #optimizer = torch.optim.ASGD(model.parameters(), lr=lr, weight_decay=0.01)
         criterion_train = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"])
         criterion_eval = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"], reduction='sum')
 
@@ -61,10 +63,17 @@ if __name__ == "__main__":
         perplexities = []
         best_ppl = math.inf
         best_model = None
+
+        # NT-AvSGD variables
+        best_loss = float('inf')
+        trigger_counter = 0
+        averaged_params = None
+
         pbar = tqdm(range(1,n_epochs+1))
-        #If the PPL is too high try to change the learning rate
+        
         for epoch in pbar:
-            loss = train_loop(train_loader, optimizer, criterion_train, model, clip)    
+            # Training loop
+            loss = train_loop(train_loader, optimizer, criterion_train, model, clip)
 
             if epoch % 1 == 0:
                 sampled_epochs.append(epoch)
@@ -74,28 +83,52 @@ if __name__ == "__main__":
                 perplexities.append(ppl_dev)
                 pbar.set_description(f"PPL: {ppl_dev:.2f} | LR: {lr:.5f} | hid_size: {hid_size} | emb_size: {emb_size} | batch_train: {batch_train} | batch_dev_test: {batch_dev_test}")
 
+                # NT-AvSGD logic
+                if loss_dev < best_loss:
+                    best_loss = loss_dev
+                    trigger_counter = 0
+                else:
+                    trigger_counter += 1
+
+                if trigger_counter >= patience:
+                    print("Triggering averaging...")
+                    if averaged_params is None:
+                        averaged_params = [p.clone().detach() for p in model.parameters()]
+                    else:
+                        for avg_p, p in zip(averaged_params, model.parameters()):
+                            avg_p.data.add_(p.data).div_(2)  # Media dei parametri
+
+                    trigger_counter = 0  # Reset del contatore
+
+                # Save the best model based on validation perplexity
                 if  ppl_dev < best_ppl: 
                     best_ppl = ppl_dev
                     best_model = copy.deepcopy(model).to(device)
                     patience = patience
                 else:
                     patience -= 1
-                    
-                if patience <= 0: # Early stopping with patience
-                    break # Not nice but it keeps the code clean
+
+                # Early stopping logic
+                if patience <= 0:
+                    break
+
+        # Apply averaged parameters before testing
+        if averaged_params is not None:
+            print("Applying averaged parameters...")
+            for avg_p, p in zip(averaged_params, model.parameters()):
+                p.data.copy_(avg_p.data)
 
         best_model.to(device)
-        final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
+        final_ppl,_ = eval_loop(test_loader, criterion_eval,best_model)    
         print('Test ppl: ', final_ppl)
 
-        model_name = f"LSTM_WT_VD_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  # Placeholder for final PPL
-        result_path=os.path.join("Results", model_name)
-        os.makedirs(result_path, exist_ok=True)
+        model_name=f"LSTM_WT_VD_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  
+        result_path=os.path.join("Results",model_name)
+        os.makedirs(result_path ,exist_ok=True)
 
-        with open(os.path.join(result_path, f"results_{model_name}.txt"), "a") as f:
+        with open(os.path.join(result_path,f"results_{model_name}.txt"),"a") as f:
             f.write(f"\n{model_name}\n\n")
-            f.write(f"hid_size={hid_size}, \nemb_size={emb_size}, \nlr={lr}, \nclip={clip}, \nn_epochs={n_epochs}, \npatience={patience}, \nbatch_train={batch_train}, \nbatch_dev_test={batch_dev_test}, \ntest_ppl={final_ppl}\n")
-    
+            f.write(f"hid_size={hid_size}, \nemb_size={emb_size}, \nlr={lr}, \nn_epochs={n_epochs}, \nbatch_train={batch_train}, \nbatch_dev_test={batch_dev_test}, \ntest_ppl={final_ppl}\n")    
 
         # Loss plot
         loss_dir = os.path.dirname(os.path.join(result_path, "loss_plot.png"))
@@ -111,5 +144,3 @@ if __name__ == "__main__":
         # To save the model
         path = os.path.join(result_path, f'{model_name}.pt')
         torch.save(model.state_dict(), path)
-        # model = LM_LSTM_DROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-        # model.load_state_dict(torch.load(path))
