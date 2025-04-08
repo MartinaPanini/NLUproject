@@ -52,9 +52,8 @@ class LM_LSTM_DROPOUT(nn.Module):
                             batch_first=True, dropout=out_dropout if n_layers > 1 else 0)
         
         self.pad_token = pad_index
-        self.out_dropout = nn.Dropout(out_dropout)
         
-        # Linear layer to project the hidden layer to our output space
+        self.out_dropout = nn.Dropout(out_dropout)
         self.output = nn.Linear(hidden_size, output_size)
         
     def forward(self, input_sequence):
