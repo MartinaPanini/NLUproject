@@ -49,8 +49,7 @@ if __name__ == "__main__":
             hid_sizes, emb_sizes, lrs, batch_train_list, batch_dev_test_list):
         vocab_len = len(lang.word2id)
 
-        model = LM_LSTM_VarDROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-        nn.init.xavier_uniform_(model.embedding.weight)
+        model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
 
         #optimizer = torch.optim.SGD(model.parameters(), lr=lr, weight_decay=0.01)
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
@@ -83,23 +82,6 @@ if __name__ == "__main__":
                 perplexities.append(ppl_dev)
                 pbar.set_description(f"PPL: {ppl_dev:.2f} | LR: {lr:.5f} | hid_size: {hid_size} | emb_size: {emb_size} | batch_train: {batch_train} | batch_dev_test: {batch_dev_test}")
 
-                # NT-AvSGD logic
-                if loss_dev < best_loss:
-                    best_loss = loss_dev
-                    trigger_counter = 0
-                else:
-                    trigger_counter += 1
-
-                if trigger_counter >= patience:
-                    print("Triggering averaging...")
-                    if averaged_params is None:
-                        averaged_params = [p.clone().detach() for p in model.parameters()]
-                    else:
-                        for avg_p, p in zip(averaged_params, model.parameters()):
-                            avg_p.data.add_(p.data).div_(2)  # Media dei parametri
-
-                    trigger_counter = 0  # Reset del contatore
-
                 # Save the best model based on validation perplexity
                 if  ppl_dev < best_ppl: 
                     best_ppl = ppl_dev
@@ -122,7 +104,7 @@ if __name__ == "__main__":
         final_ppl,_ = eval_loop(test_loader, criterion_eval,best_model)    
         print('Test ppl: ', final_ppl)
 
-        model_name=f"LSTM_WT_VD_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  
+        model_name=f"LSTM_WT_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  
         result_path=os.path.join("Results",model_name)
         os.makedirs(result_path ,exist_ok=True)
 

@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-class LM_LSTM_VarDROPOUT(nn.Module):
+class LM_LSTM(nn.Module):
     def __init__(self, emb_size, hidden_size, output_size, pad_index=0, out_dropout=0.1,
                  emb_dropout=0.1, n_layers=1):
-        super(LM_LSTM_VarDROPOUT, self).__init__()
+        super(LM_LSTM, self).__init__()
         
         self.embedding = nn.Embedding(output_size, emb_size, padding_idx=pad_index)
         self.emb_dropout = nn.Dropout(emb_dropout)  # Dropout on embeddings
