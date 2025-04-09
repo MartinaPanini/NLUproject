@@ -72,7 +72,7 @@ if __name__ == "__main__":
     clip = 5
     n_epochs = 200
     runs = 5
-    patience = 3
+    patience = 5
     losses_train = []
     losses_dev = []
     sampled_epochs = []
@@ -87,33 +87,24 @@ if __name__ == "__main__":
     all_intent_accs = []
 
     # Train loop
-    for run in tqdm(range(0, runs)):
+    for x in tqdm(range(0, runs)):
         model = ModelIAS(hid_size, out_slot, out_int, emb_size, 
                         vocab_len, pad_index=PAD_TOKEN).to(device)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
         criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
         criterion_intents = nn.CrossEntropyLoss()
-
-        patience = 3
-        losses_train = []
-        losses_dev = []
-        sampled_epochs = []
-        best_f1 = 0
-
+        
         slot_f1s, intent_acc = [], []
-        for epoch in range(1, n_epochs):
+
+        for x in range(1,n_epochs):
             loss = train_loop(train_loader, optimizer, criterion_slots, 
                             criterion_intents, model)
-            if epoch % 5 == 0:
-                sampled_epochs.append(epoch)
+            if x % 5 == 0:
+                sampled_epochs.append(x)
                 losses_train.append(np.asarray(loss).mean())
                 results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, 
                                                             criterion_intents, model, lang)
-                y_true_labels = intent_res['all_true']
-                y_pred_labels = intent_res['all_preds']
-
-                report_str = classification_report(y_true_labels, y_pred_labels, digits=3, zero_division=0)
                 losses_dev.append(np.asarray(loss_dev).mean())
                 f1 = results_dev['total']['f']
 
@@ -121,55 +112,42 @@ if __name__ == "__main__":
                     best_f1 = f1
                 else:
                     patience -= 1
-                if patience <= 0:  # Early stopping with patience
-                    break
+                if patience <= 0: # Early stopping with patient
+                    break # Not nice but it keeps the code clean
 
-        intent_acc.append(intent_res['accuracy'])
-        slot_f1s.append(results_dev['total']['f'])
-        all_slot_f1s.append(np.mean(slot_f1s))
-        all_intent_accs.append(np.mean(intent_acc))
+        results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, 
+                                                criterion_intents, model, lang)
+        intent_acc.append(intent_test['accuracy'])
+        slot_f1s.append(results_test['total']['f'])
+    slot_f1s = np.asarray(slot_f1s)
+    intent_acc = np.asarray(intent_acc)
+    print('Slot F1', round(slot_f1s.mean(),3), '+-', round(slot_f1s.std(),3))
+    print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
 
-        print(f"Run {run+1} - Slot F1: {round(np.mean(slot_f1s), 3)} ± {round(np.std(slot_f1s), 3)}")
-        print(f"Run {run+1} - Intent Acc: {round(np.mean(intent_acc), 3)} ± {round(np.std(intent_acc), 3)}")
+    # ==== Save Results ====
+    model_name = f"IAS_BI_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
+    result_path = os.path.join("Results", model_name)
+    os.makedirs(result_path, exist_ok=True)
 
-        # ==== Save Results ====
-        model_name = f"IAS_BI_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
-        result_path = os.path.join("Results", model_name)
-        os.makedirs(result_path, exist_ok=True)
+    results_txt = os.path.join(result_path, f"results_{model_name}.txt")
+    with open(results_txt, "w") as f:
+        f.write(f"{model_name}\n\n")
+        f.write(f"Slot F1: {round(np.mean(slot_f1s), 3)} ± {round(np.std(slot_f1s), 3)}\n")
+        f.write(f"Intent Accuracy: {round(np.mean(intent_acc), 3)} ± {round(np.std(intent_acc), 3)}\n")
+        f.write(f"Best dev F1: {round(best_f1, 3)}\n")
+        f.write(f"Training epochs: {sampled_epochs[-1] if sampled_epochs else 'N/A'}\n")
 
-        results_txt = os.path.join(result_path, f"results_{model_name}.txt")
-        with open(results_txt, "w") as f:
-            f.write(f"{model_name}\n\n")
-            f.write(f"Slot F1: {round(np.mean(slot_f1s), 3)} ± {round(np.std(slot_f1s), 3)}\n")
-            f.write(f"Intent Accuracy: {round(np.mean(intent_acc), 3)} ± {round(np.std(intent_acc), 3)}\n")
-            f.write(f"Best dev F1: {round(best_f1, 3)}\n")
-            f.write(f"Training epochs: {sampled_epochs[-1] if sampled_epochs else 'N/A'}\n")
-        
-        classification_report_path = os.path.join(result_path, f"classification_report_{model_name}.txt")
-        with open(classification_report_path, "w") as f:
-            f.write("=== Classification Report (Intent Classification) ===\n\n")
-            f.write(report_str)
+    # ==== Plot Losses ====
+    plt.figure()
+    plt.plot(sampled_epochs, losses_train, label='Train Loss')
+    plt.plot(sampled_epochs, losses_dev, label='Dev Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(f'Training and Dev Loss {model_name}')
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.savefig(os.path.join(result_path, "loss_plot.png"))
+    plt.close()
 
-        # ==== Plot Losses ====
-        plt.figure()
-        plt.plot(sampled_epochs, losses_train, label='Train Loss')
-        plt.plot(sampled_epochs, losses_dev, label='Dev Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Dev Loss')
-        plt.legend()
-        plt.grid()
-        plt.tight_layout()
-        plt.savefig(os.path.join(result_path, "loss_plot.png"))
-        plt.close()
 
-    # After all runs, calculate the average and std for Slot F1 and Intent Accuracy
-    print(f"\nOverall results after {runs} runs:")
-    print(f"Slot F1: {round(np.mean(all_slot_f1s), 3)} ± {round(np.std(all_slot_f1s), 3)}")
-    print(f"Intent Accuracy: {round(np.mean(all_intent_accs), 3)} ± {round(np.std(all_intent_accs), 3)}")
-
-    # Save overall results
-    overall_results_path = os.path.join("Results", "overall_results.txt")
-    with open(overall_results_path, "w") as f:
-        f.write(f"Overall Slot F1: {round(np.mean(all_slot_f1s), 3)} ± {round(np.std(all_slot_f1s), 3)}\n")
-        f.write(f"Overall Intent Accuracy: {round(np.mean(all_intent_accs), 3)} ± {round(np.std(all_intent_accs), 3)}\n")
