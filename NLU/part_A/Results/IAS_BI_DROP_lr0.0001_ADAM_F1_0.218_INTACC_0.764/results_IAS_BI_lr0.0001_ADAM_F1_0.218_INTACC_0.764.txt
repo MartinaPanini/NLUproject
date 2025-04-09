@@ -1,0 +1,6 @@
+IAS_BI_lr0.0001_ADAM_F1_0.218_INTACC_0.764
+
+Slot F1: 0.218 ± 0.0
+Intent Accuracy: 0.764 ± 0.0
+Best dev F1: 0.969
+Training epochs: 5

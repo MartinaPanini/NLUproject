@@ -68,7 +68,7 @@ if __name__ == "__main__":
     # Training Setup
     hid_size = 200
     emb_size = 300
-    lr = 0.0001
+    lr = 0.01
     clip = 5
     n_epochs = 200
     runs = 5
@@ -92,6 +92,7 @@ if __name__ == "__main__":
                         vocab_len, pad_index=PAD_TOKEN).to(device)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
+        #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
         criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
         criterion_intents = nn.CrossEntropyLoss()
         
@@ -121,8 +122,8 @@ if __name__ == "__main__":
         slot_f1s.append(results_test['total']['f'])
     slot_f1s = np.asarray(slot_f1s)
     intent_acc = np.asarray(intent_acc)
-    print('Slot F1', round(slot_f1s.mean(),3), '+-', round(slot_f1s.std(),3))
-    print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
+    # print('Slot F1', round(slot_f1s.mean(),3), '+-', round(slot_f1s.std(),3))
+    # print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
 
     # ==== Save Results ====
     model_name = f"IAS_BI_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
@@ -135,7 +136,6 @@ if __name__ == "__main__":
         f.write(f"Slot F1: {round(np.mean(slot_f1s), 3)} ± {round(np.std(slot_f1s), 3)}\n")
         f.write(f"Intent Accuracy: {round(np.mean(intent_acc), 3)} ± {round(np.std(intent_acc), 3)}\n")
         f.write(f"Best dev F1: {round(best_f1, 3)}\n")
-        f.write(f"Training epochs: {sampled_epochs[-1] if sampled_epochs else 'N/A'}\n")
 
     # ==== Plot Losses ====
     plt.figure()
