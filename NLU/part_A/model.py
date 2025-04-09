@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class ModelIAS(nn.Module):
@@ -12,56 +13,37 @@ class ModelIAS(nn.Module):
         
         self.embedding = nn.Embedding(vocab_len, emb_size, padding_idx=pad_index)
         
-        self.utt_encoder = nn.LSTM(emb_size, hid_size, n_layer, bidirectional=False, batch_first=True)    
-        self.slot_out = nn.Linear(hid_size, out_slot)
-        self.intent_out = nn.Linear(hid_size, out_int)
-        # Dropout layer How/Where do we apply it?
+        # Set bidirectional=True to use bidirectional LSTM
+        self.utt_encoder = nn.LSTM(emb_size, hid_size, n_layer, bidirectional=True, batch_first=True)    
+        self.slot_out = nn.Linear(hid_size * 2, out_slot)  # Multiply hid_size by 2 for bidirectional
+        self.intent_out = nn.Linear(hid_size * 2, out_int)  # Multiply hid_size by 2 for bidirectional
+        # Dropout layer
         self.dropout = nn.Dropout(0.1)
         
     def forward(self, utterance, seq_lengths):
         # utterance.size() = batch_size X seq_len
-        utt_emb = self.embedding(utterance) # utt_emb.size() = batch_size X seq_len X emb_size
+        utt_emb = self.embedding(utterance)  # utt_emb.size() = batch_size X seq_len X emb_size
         
-        # pack_padded_sequence avoid computation over pad tokens reducing the computational cost
-        
+        # pack_padded_sequence avoids computation over pad tokens reducing the computational cost
         packed_input = pack_padded_sequence(utt_emb, seq_lengths.cpu().numpy(), batch_first=True)
-        # Process the batch
-        packed_output, (last_hidden, cell) = self.utt_encoder(packed_input) 
+        
+        # Process the batch through the LSTM
+        packed_output, (last_hidden, cell) = self.utt_encoder(packed_input)
        
-        # Unpack the sequence
+        # Unpack the sequence to get the actual LSTM outputs
         utt_encoded, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
-        # Get the last hidden state
-        last_hidden = last_hidden[-1,:,:]
         
-        # Is this another possible way to get the last hiddent state? (Why?)
-        # utt_encoded.permute(1,0,2)[-1]
+        # Get the last hidden state from both directions (concatenated)
+        # The output shape for bidirectional LSTM will have the size [2 * hidden_size]
+        last_hidden = torch.cat((last_hidden[-2,:,:], last_hidden[-1,:,:]), dim=1)
         
-        # Compute slot logits
+        # Compute slot logits (this includes both directions of the LSTM output)
         slots = self.slot_out(utt_encoded)
+        
         # Compute intent logits
         intent = self.intent_out(last_hidden)
         
         # Slot size: batch_size, seq_len, classes 
-        slots = slots.permute(0,2,1) # We need this for computing the loss
-        # Slot size: batch_size, classes, seq_len
+        slots = slots.permute(0, 2, 1)  # We need this for computing the loss
+        
         return slots, intent
-    
-def init_weights(mat):
-    for m in mat.modules():
-        if type(m) in [nn.GRU, nn.LSTM, nn.RNN]:
-            for name, param in m.named_parameters():
-                if 'weight_ih' in name:
-                    for idx in range(4):
-                        mul = param.shape[0]//4
-                        nn.init.xavier_uniform_(param[idx*mul:(idx+1)*mul])
-                elif 'weight_hh' in name:
-                    for idx in range(4):
-                        mul = param.shape[0]//4
-                        nn.init.orthogonal_(param[idx*mul:(idx+1)*mul])
-                elif 'bias' in name:
-                    param.data.fill_(0)
-        else:
-            if type(m) in [nn.Linear]:
-                nn.init.uniform_(m.weight, -0.01, 0.01)
-                if m.bias != None:
-                    m.bias.data.fill_(0.01)
