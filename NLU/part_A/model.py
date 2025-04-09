@@ -18,6 +18,8 @@ class ModelIAS(nn.Module):
         self.slot_out = nn.Linear(hid_size * 2, out_slot)  # Multiply hid_size by 2 for bidirectional
         self.intent_out = nn.Linear(hid_size * 2, out_int)  # Multiply hid_size by 2 for bidirectional
         
+        self.dropout = nn.Dropout(0.5)  # Dropout layer to prevent overfitting
+        
     def forward(self, utterance, seq_lengths):
         # utterance.size() = batch_size X seq_len
         utt_emb = self.embedding(utterance)  # utt_emb.size() = batch_size X seq_len X emb_size
