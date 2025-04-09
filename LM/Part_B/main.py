@@ -34,7 +34,7 @@ if __name__ == "__main__":
 ####################################################################################################################################################################
     hid_sizes = [300]
     emb_sizes = [500]
-    lrs = [0.0001] 
+    lrs = [5] 
     clips = [5]
     n_epochs_list = [100]
     patience_list = [5]
@@ -145,10 +145,7 @@ if __name__ == "__main__":
         final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
         print('Test ppl: ', final_ppl)
 
-        if emb_size == hid_size:
-            model_name = f"LSTM_WT_VARDROP_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  
-        else:
-            model_name = f"LSTM_VARDROP_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"
+        model_name = f"LSTM_NTAvSGD_PPL_{final_ppl:.2f}_LR_{lr}"
         # Save the results
         result_path=os.path.join("Results", model_name)
         os.makedirs(result_path, exist_ok=True)

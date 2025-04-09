@@ -34,7 +34,8 @@ if __name__ == "__main__":
 ####################################################################################################################################################################
     hid_sizes = [100]
     emb_sizes = [300]
-    lrs = [0.00001]
+    lrs = [0.001, 0.0001] # for AdamW
+    #lrs = [0.1, 1, 3] # for SGD
     clips = [5]
     n_epochs_list = [100]
     patience_list = [3]
@@ -47,7 +48,7 @@ if __name__ == "__main__":
         
         #model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
         #model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-        model = LM_LSTM_DROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+        model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
         model.apply(init_weights)
 
         #optimizer = optim.SGD(model.parameters(), lr=lr)
