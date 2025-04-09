@@ -42,10 +42,6 @@ if __name__ == "__main__":
     dev_raw = X_dev
     y_test = [x['intent'] for x in test_raw]
 
-    print('TRAIN size:', len(train_raw))
-    print('DEV size:', len(dev_raw))
-    print('TEST size:', len(test_raw))
-
     # Dizionari iniziali
     w2id = {'pad': PAD_TOKEN, 'unk': 1}
     slot2id = {'pad': PAD_TOKEN}
