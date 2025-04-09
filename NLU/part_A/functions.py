@@ -1,5 +1,6 @@
 from conll import evaluate
 from sklearn.metrics import classification_report
+import torch
 
 def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=5):
     model.train()

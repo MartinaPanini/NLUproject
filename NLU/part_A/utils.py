@@ -3,6 +3,7 @@ from pprint import pprint
 from collections import Counter
 import torch
 import torch.utils.data as data
+import os
 
 def load_data(path):
     '''
