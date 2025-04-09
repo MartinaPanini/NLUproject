@@ -9,7 +9,9 @@ from sklearn.model_selection import train_test_split
 from collections import Counter
 from torch.utils.data import DataLoader
 from torch import optim
-import tqdm
+import torch
+from tqdm import tqdm
+import os
 
 if __name__ == "__main__":
     
@@ -74,7 +76,7 @@ if __name__ == "__main__":
     lr = 0.0001 # learning rate
     clip = 5 # Clip the gradient
 
-    n_epochs = 2
+    n_epochs = 200
     runs = 5
     patience = 3
     losses_train = []
