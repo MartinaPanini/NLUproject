@@ -1,0 +1,12 @@
+
+LSTM_VARDROP_ADAMW_PPL_116.88_LR_0.001
+
+hid_size=300, 
+emb_size=500, 
+lr=0.001, 
+clip=5, 
+n_epochs=100, 
+patience=0, 
+batch_train=64, 
+batch_dev_test=128, 
+test_ppl=116.88475203690476
