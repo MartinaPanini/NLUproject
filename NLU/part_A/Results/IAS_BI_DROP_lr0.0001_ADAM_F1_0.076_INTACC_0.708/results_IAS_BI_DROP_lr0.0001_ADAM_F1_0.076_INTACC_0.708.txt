@@ -1,0 +1,30 @@
+IAS_BI_DROP_lr0.0001_ADAM_F1_0.076_INTACC_0.708
+
+epochs used: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155, 160, 165, 170, 175, 180, 185, 190, 195, 5, 10, 15, 5, 5, 5] 
+number epochs: 200 
+lr: 0.0001 
+hidden_size: 200 
+embedding_size: 300 
+model: ModelIAS(
+  (embedding): Embedding(866, 300, padding_idx=0)
+  (utt_encoder): LSTM(300, 200, batch_first=True, bidirectional=True)
+  (slot_out): Linear(in_features=400, out_features=130, bias=True)
+  (intent_out): Linear(in_features=400, out_features=26, bias=True)
+  (dropout): Dropout(p=0.5, inplace=False)
+) 
+optimizer: Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    capturable: False
+    differentiable: False
+    eps: 1e-08
+    foreach: None
+    fused: None
+    lr: 0.0001
+    maximize: False
+    weight_decay: 0
+) 
+Slot F1: 0.076 ± 0.0 
+Intent Accuracy: 0.708 ± 0.0 
+Best dev F1: 0.968

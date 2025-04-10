@@ -3,7 +3,6 @@ from utils import *
 from model import *
 from conll import evaluate
 from sklearn.metrics import classification_report
-import random
 import numpy as np
 from sklearn.model_selection import train_test_split
 from collections import Counter
@@ -14,12 +13,12 @@ from tqdm import tqdm
 import os
 import matplotlib.pyplot as plt
 import copy
-import json
+from transformers import BertConfig
 
 if __name__ == "__main__":
 
-    bidirectional = False
-    dropout = False
+    bert = BertConfig.from_pretrained("bert-base-uncased")
+
     PAD_TOKEN = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -63,7 +62,7 @@ if __name__ == "__main__":
     test_dataset = IntentsAndSlots(test_raw, lang)
 
     # Create Dataloaders
-    train_loader = DataLoader(train_dataset, batch_size=128, collate_fn=collate_fn,  shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, collate_fn=collate_fn)
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=collate_fn)
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=collate_fn)
 
@@ -80,6 +79,7 @@ if __name__ == "__main__":
     losses_dev = []
     sampled_epochs = []
     best_f1 = 0
+    ignore_list= 102
     all_slot_f1s = []
     all_intent_accs = []
 
@@ -90,20 +90,16 @@ if __name__ == "__main__":
 
     # Train loop
     for x in tqdm(range(0, runs)):
-        model = ModelIAS(hid_size, out_slot, out_int, emb_size, 
-                        vocab_len, pad_index=PAD_TOKEN, isDropout=dropout, isBidirectional=bidirectional).to(device)
-        model.apply(init_weights)
+        model = ModelBert(bert, out_slot, out_int, ignore_list).to(device)
+        optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)   
 
-        optimizer = optim.Adam(model.parameters(), lr=lr)
-        #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
         criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
         criterion_intents = nn.CrossEntropyLoss()
         
         slot_f1s, intent_acc = [], []
 
         for x in range(1,n_epochs):
-            loss = train_loop(train_loader, optimizer, criterion_slots, 
-                            criterion_intents, model)
+            loss = train_loop(train_loader, optimizer, criterion_slots, criterion_intents, model)
             if x % 5 == 0:
                 sampled_epochs.append(x)
                 losses_train.append(np.asarray(loss).mean())
@@ -127,20 +123,14 @@ if __name__ == "__main__":
         slot_f1s.append(results_test['total']['f'])
     slot_f1s = np.asarray(slot_f1s)
     intent_acc = np.asarray(intent_acc)
-    # print('Slot F1', round(slot_f1s.mean(),3), '+-', round(slot_f1s.std(),3))
-    # print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
+    print('Slot F1', round(slot_f1s.mean(),3), '+-', round(slot_f1s.std(),3))
+    print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
 
     # ==== Save Results ====
-    if dropout and  (not bidirectional):
-        model_name = f"IAS_DROP_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
-    elif bidirectional and (not dropout):
-        model_name = f"IAS_BI_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
-    elif bidirectional and dropout:
-        model_name = f"IAS_BI_DROP_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
-    elif (not bidirectional) and (not dropout):
-        model_name = f"IAS_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
+    model_name = f"BERT_lr{lr}_ADAMW_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
     result_path = os.path.join("Results", model_name)
     os.makedirs(result_path, exist_ok=True)
+    print(f"Results saved in {result_path}")
 
     # ==== Plot Losses ====
     plt.figure(figsize=(15, 6))

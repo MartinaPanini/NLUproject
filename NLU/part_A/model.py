@@ -17,16 +17,18 @@ class ModelIAS(nn.Module):
         self.embedding = nn.Embedding(vocab_len, emb_size, padding_idx=pad_index)
         
         # Set bidirectional=True to use bidirectional LSTM
-        self.utt_encoder = nn.LSTM(emb_size, hid_size, n_layer, bidirectional=True, batch_first=True)  
+        
         if isBidirectional:  
+            self.utt_encoder = nn.LSTM(emb_size, hid_size, n_layer, bidirectional=True, batch_first=True)  
             self.slot_out = nn.Linear(hid_size * 2, out_slot)  # Multiply hid_size by 2 for bidirectional
             self.intent_out = nn.Linear(hid_size * 2, out_int)  # Multiply hid_size by 2 for bidirectional
         else:
+            self.utt_encoder = nn.LSTM(emb_size, hid_size, n_layer, bidirectional=False, batch_first=True)  
             self.slot_out = nn.Linear(hid_size, out_slot)
             self.intent_out = nn.Linear(hid_size, out_int)
         if isDropout:
             # Dropout layer
-            self.dropout = nn.Dropout(0.5)
+            self.dropout = nn.Dropout(0.1)
         
     def forward(self, utterance, seq_lengths):
         # utterance.size() = batch_size X seq_len
@@ -63,3 +65,23 @@ class ModelIAS(nn.Module):
         slots = slots.permute(0, 2, 1)  # We need this for computing the loss
         
         return slots, intent
+
+def init_weights(mat):
+    for m in mat.modules():
+        if type(m) in [nn.GRU, nn.LSTM, nn.RNN]:
+            for name, param in m.named_parameters():
+                if 'weight_ih' in name:
+                    for idx in range(4):
+                        mul = param.shape[0]//4
+                        torch.nn.init.xavier_uniform_(param[idx*mul:(idx+1)*mul])
+                elif 'weight_hh' in name:
+                    for idx in range(4):
+                        mul = param.shape[0]//4
+                        torch.nn.init.orthogonal_(param[idx*mul:(idx+1)*mul])
+                elif 'bias' in name:
+                    param.data.fill_(0)
+        else:
+            if type(m) in [nn.Linear]:
+                torch.nn.init.uniform_(m.weight, -0.01, 0.01)
+                if m.bias != None:
+                    m.bias.data.fill_(0.01)

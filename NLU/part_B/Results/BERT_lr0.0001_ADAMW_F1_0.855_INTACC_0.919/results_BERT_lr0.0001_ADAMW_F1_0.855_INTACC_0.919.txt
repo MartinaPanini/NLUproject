@@ -1,0 +1,10 @@
+BERT_lr0.0001_ADAMW_F1_0.855_INTACC_0.919
+
+epochs used: 12 
+number epochs: 200 
+lr: 0.0001 
+hidden_size: 200 
+embedding_size: 300 
+Slot F1: 0.855 ± 0.0 
+Intent Accuracy: 0.919 ± 0.0 
+Best dev F1: 0.968
