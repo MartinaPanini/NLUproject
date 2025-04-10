@@ -15,6 +15,9 @@ import os
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
+
+    bidirectional = True
+    dropout = True
     
     PAD_TOKEN = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -89,7 +92,7 @@ if __name__ == "__main__":
     # Train loop
     for x in tqdm(range(0, runs)):
         model = ModelIAS(hid_size, out_slot, out_int, emb_size, 
-                        vocab_len, pad_index=PAD_TOKEN).to(device)
+                        vocab_len, pad_index=PAD_TOKEN, isDropout=dropout, isBidirectional=bidirectional).to(device)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
         #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
@@ -126,7 +129,14 @@ if __name__ == "__main__":
     # print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
 
     # ==== Save Results ====
-    model_name = f"IAS_BI_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
+    if dropout and  (not bidirectional):
+        model_name = f"IAS_DROP_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
+    if bidirectional and (not dropout):
+        model_name = f"IAS_BI_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
+    if bidirectional and dropout:
+        model_name = f"IAS_BI_DROP_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
+    else:
+        model_name = f"IAS_lr{lr}_ADAM_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
     result_path = os.path.join("Results", model_name)
     os.makedirs(result_path, exist_ok=True)
 
