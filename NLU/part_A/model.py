@@ -26,12 +26,14 @@ class ModelIAS(nn.Module):
             self.intent_out = nn.Linear(hid_size, out_int)
         if isDropout:
             # Dropout layer
-            self.dropout = nn.Dropout(0.1)
+            self.dropout = nn.Dropout(0.5)
         
     def forward(self, utterance, seq_lengths):
         # utterance.size() = batch_size X seq_len
         utt_emb = self.embedding(utterance)  # utt_emb.size() = batch_size X seq_len X emb_size
         
+        if (self.isDropout):
+            utt_emb = self.dropout(utt_emb)
         # pack_padded_sequence avoids computation over pad tokens reducing the computational cost
         packed_input = pack_padded_sequence(utt_emb, seq_lengths.cpu().numpy(), batch_first=True)
         
@@ -49,6 +51,9 @@ class ModelIAS(nn.Module):
             last_hidden = last_hidden[-1,:,:]
         
         # Compute slot logits (this includes both directions of the LSTM output)
+        if (self.isDropout):
+            utt_encoded = self.dropout(utt_encoded)
+            last_hidden = self.dropout(last_hidden)
         slots = self.slot_out(utt_encoded)
         
         # Compute intent logits

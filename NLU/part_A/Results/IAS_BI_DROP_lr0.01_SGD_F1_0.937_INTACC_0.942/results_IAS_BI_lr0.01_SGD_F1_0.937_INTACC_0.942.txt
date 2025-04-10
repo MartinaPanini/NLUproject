@@ -1,5 +1,0 @@
-IAS_BI_lr0.01_SGD_F1_0.937_INTACC_0.942
-
-Slot F1: 0.937 ± 0.0
-Intent Accuracy: 0.942 ± 0.0
-Best dev F1: 0.979
