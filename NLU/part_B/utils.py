@@ -4,6 +4,9 @@ from collections import Counter
 import torch
 import torch.utils.data as data
 import os
+from transformers import BertTokenizerFast
+
+tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
 
 def load_data(path):
     '''
@@ -45,9 +48,7 @@ class Lang():
                 vocab[elem] = len(vocab)
         return vocab
 
-
-class IntentsAndSlots (data.Dataset):
-    # Mandatory methods are __init__, __len__ and __getitem__
+class IntentsAndSlots(data.Dataset):
     def __init__(self, dataset, lang, unk='unk'):
         self.utterances = []
         self.intents = []
@@ -55,40 +56,48 @@ class IntentsAndSlots (data.Dataset):
         self.unk = unk
         
         for x in dataset:
-            self.utterances.append(x['utterance'])
-            self.slots.append(x['slots'])
+            # Tokenizza la frase usando BertTokenizerFast
+            tokenized = tokenizer(x['utterance'], padding='max_length', truncation=True, max_length=64, return_tensors='pt')
+            input_ids = tokenized['input_ids'].squeeze().tolist()  # Rimuove la dimensione extra
+            self.utterances.append(input_ids)
+            
+            # Gestione della sub-tokenizzazione per gli slot
+            label_ids = []
+            previous_word_id = None
+            for word_label, word_ids in zip(x['slots'], tokenized.word_ids()):
+                if word_ids is None:
+                    label_ids.append(-100)  # Etichetta speciale per il padding
+                elif word_ids != previous_word_id:
+                    # Aggiungi l'etichetta per il token corrispondente
+                    label_ids.append(lang.slot2id.get(word_label, lang.slot2id[self.unk]))  
+                    previous_word_id = word_ids
+                else:
+                    # Se è un sub-token (parte di una parola) non aggiungere etichetta
+                    label_ids.append(-100)
+            
+            # Se la lunghezza della lista delle etichette degli slot è diversa dalla lunghezza dei token,
+            # completa con etichette di padding (-100).
+            label_ids = label_ids + [-100] * (len(input_ids) - len(label_ids))
+            self.slots.append(label_ids)
+
             self.intents.append(x['intent'])
 
-        self.utt_ids = self.mapping_seq(self.utterances, lang.word2id)
-        self.slot_ids = self.mapping_seq(self.slots, lang.slot2id)
+        self.slot_ids = self.slots
         self.intent_ids = self.mapping_lab(self.intents, lang.intent2id)
 
     def __len__(self):
         return len(self.utterances)
 
     def __getitem__(self, idx):
-        utt = torch.Tensor(self.utt_ids[idx])
+        utt = torch.Tensor(self.utterances[idx])
         slots = torch.Tensor(self.slot_ids[idx])
         intent = self.intent_ids[idx]
         sample = {'utterance': utt, 'slots': slots, 'intent': intent}
         return sample
-    
-    # Auxiliary methods
-    
+
+    # Mapping dei label
     def mapping_lab(self, data, mapper):
         return [mapper[x] if x in mapper else mapper[self.unk] for x in data]
-    
-    def mapping_seq(self, data, mapper): # Map sequences to number
-        res = []
-        for seq in data:
-            tmp_seq = []
-            for x in seq.split():
-                if x in mapper:
-                    tmp_seq.append(mapper[x])
-                else:
-                    tmp_seq.append(mapper[self.unk])
-            res.append(tmp_seq)
-        return res
 
 def collate_fn(data):
     def merge(sequences):

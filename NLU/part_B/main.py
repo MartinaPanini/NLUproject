@@ -7,13 +7,14 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from collections import Counter
 from torch.utils.data import DataLoader
-from torch import optim
+from torch import optim, nn
 import torch
 from tqdm import tqdm
 import os
 import matplotlib.pyplot as plt
 import copy
-from transformers import BertConfig
+from transformers import BertConfig, get_linear_schedule_with_warmup  # Importa lo scheduler
+import json  # Aggiunto per il salvataggio delle mappature
 
 if __name__ == "__main__":
 
@@ -56,12 +57,12 @@ if __name__ == "__main__":
 
     lang = Lang(words, intents, slots, cutoff=0)
 
-    # Create datasets
+    # Crea i dataset
     train_dataset = IntentsAndSlots(train_raw, lang)
     dev_dataset = IntentsAndSlots(dev_raw, lang)
     test_dataset = IntentsAndSlots(test_raw, lang)
 
-    # Create Dataloaders
+    # Crea i Dataloader
     train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, collate_fn=collate_fn)
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=collate_fn)
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=collate_fn)
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     losses_dev = []
     sampled_epochs = []
     best_f1 = 0
-    ignore_list= 102
+    ignore_list = 102
     all_slot_f1s = []
     all_intent_accs = []
 
@@ -87,21 +88,28 @@ if __name__ == "__main__":
     out_int = len(lang.intent2id)
     vocab_len = len(lang.word2id)
 
-
     # Train loop
     for x in tqdm(range(0, runs)):
-        model = ModelBert(bert, out_slot, out_int, ignore_list).to(device)
-        optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)   
+        model = BERT(bert, out_slot, out_int, ignore_list).to(device)
+        optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)  
+
+        # Define scheduler for learning rate
+        total_steps = len(train_loader) * n_epochs  # Total steps for training
+        scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                    num_warmup_steps=0,  # You can adjust this for warmup
+                                                    num_training_steps=total_steps)
 
         criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
         criterion_intents = nn.CrossEntropyLoss()
-        
+
         slot_f1s, intent_acc = [], []
 
-        for x in range(1,n_epochs):
+        for epoch in range(1, n_epochs + 1):  # Loop over epochs
             loss = train_loop(train_loader, optimizer, criterion_slots, criterion_intents, model)
-            if x % 5 == 0:
-                sampled_epochs.append(x)
+            scheduler.step()  # Step the scheduler after every batch update
+
+            if epoch % 5 == 0:
+                sampled_epochs.append(epoch)
                 losses_train.append(np.asarray(loss).mean())
                 results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, criterion_intents, model, lang)
                 losses_dev.append(np.asarray(loss_dev).mean())
@@ -113,17 +121,19 @@ if __name__ == "__main__":
                     patience = 3
                 else:
                     patience -= 1
-                if patience <= 0: # Early stopping with patient
-                    break # Not nice but it keeps the code clean
-        
+                if patience <= 0:  # Early stopping with patience
+                    break  # Stop training early if patience is exceeded
+
         best_model.to(device)
 
-        results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, model, lang)
+        # Evaluate on the test set after training
+        results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, best_model, lang)
         intent_acc.append(intent_test['accuracy'])
         slot_f1s.append(results_test['total']['f'])
+
     slot_f1s = np.asarray(slot_f1s)
     intent_acc = np.asarray(intent_acc)
-    print('Slot F1', round(slot_f1s.mean(),3), '+-', round(slot_f1s.std(),3))
+    print('Slot F1', round(slot_f1s.mean(), 3), '+-', round(slot_f1s.std(), 3))
     print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
 
     # ==== Save Results ====
@@ -132,17 +142,40 @@ if __name__ == "__main__":
     os.makedirs(result_path, exist_ok=True)
     print(f"Results saved in {result_path}")
 
-    # ==== Plot Losses ====
-    plt.figure(figsize=(15, 6))
-    plt.plot(sampled_epochs, losses_train, label='Train Loss', marker='o')
-    plt.plot(sampled_epochs, losses_dev, label='Dev Loss', marker='s')
-    plt.xlabel('Epoch')
+    # ===== Save Model, Tokenizer, and Label Mappings =====
+    print("Salvataggio del modello, tokenizer e mappature delle etichette...")
+
+    # Salva il modello fine-tunato
+    model_path = os.path.join(result_path, "bert_model")
+    best_model.save_pretrained(model_path)
+
+    # Salva il tokenizer
+    tokenizer_path = os.path.join(result_path, "bert_tokenizer")
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+    tokenizer.save_pretrained(tokenizer_path)
+
+    # Salva le mappature delle etichette
+    labels_path = os.path.join(result_path, "labels")
+    os.makedirs(labels_path, exist_ok=True)
+
+    with open(os.path.join(labels_path, "intent2id.json"), 'w') as f:
+        json.dump(lang.intent2id, f)
+    with open(os.path.join(labels_path, "slot2id.json"), 'w') as f:
+        json.dump(lang.slot2id, f)
+
+    print(f"Modello salvato in: {model_path}")
+    print(f"Tokenizer salvato in: {tokenizer_path}")
+    print(f"Mappature etichette salvate in: {labels_path}")
+
+    # ===== Plot Losses ====
+    plt.figure()
+    plt.plot(sampled_epochs, losses_train, label='Train Loss')
+    plt.plot(sampled_epochs, losses_dev, label='Validation Loss')
+    plt.xlabel('Epochs')
     plt.ylabel('Loss')
-    plt.title(f'Training and Dev Loss {model_name}')
     plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(result_path, "loss_plot.png"))
+    plt.title(f'Training and Validation Loss {model_name}')
+    plt.savefig(result_path + '/losses.png')
     plt.close()
 
     # ===== Report =====
@@ -157,7 +190,3 @@ if __name__ == "__main__":
         file.write(f'Slot F1: {round(np.mean(slot_f1s), 3)} ± {round(np.std(slot_f1s), 3)} \n')
         file.write(f'Intent Accuracy: {round(np.mean(intent_acc), 3)} ± {round(np.std(intent_acc), 3)} \n')
         file.write(f"Best dev F1: {round(best_f1, 3)}\n")
-        file.close()
-
-    
-   
