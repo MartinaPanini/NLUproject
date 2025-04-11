@@ -26,46 +26,27 @@ if __name__ == "__main__":
     tmp_train_raw = load_data(os.path.join('dataset/ATIS/train.json'))
     test_raw = load_data(os.path.join('dataset/ATIS/test.json'))
 
-    portion = 0.10
-    intents = [x['intent'] for x in tmp_train_raw]
-    count_y = Counter(intents)
-    labels = []
-    inputs = []
-    mini_train = []
-
-    for id_y, y in enumerate(intents):
-        if count_y[y] > 1:
-            inputs.append(tmp_train_raw[id_y])
-            labels.append(y)
-        else:
-            mini_train.append(tmp_train_raw[id_y])
-
-    # Random Stratify
-    X_train, X_dev, y_train, y_dev = train_test_split(inputs, labels, test_size=portion, 
-                                                        random_state=42, 
-                                                        shuffle=True,
-                                                        stratify=labels)
-    X_train.extend(mini_train)
-    train_raw = X_train
-    dev_raw = X_dev
-    y_test = [x['intent'] for x in test_raw]
+    train_raw, dev_raw = get_dev(tmp_train_raw)
 
     words = sum([x['utterance'].split() for x in train_raw], [])
     corpus = train_raw + dev_raw + test_raw
-    slots = set(sum([line['slots'].split() for line in corpus],[]))
+    slots = set(sum([line['slots'].split() for line in corpus], []))
     intents = set([line['intent'] for line in corpus])
 
     lang = Lang(words, intents, slots, cutoff=0)
 
-    # Crea i dataset
     train_dataset = IntentsAndSlots(train_raw, lang, tokenizer)
     dev_dataset = IntentsAndSlots(dev_raw, lang, tokenizer)
     test_dataset = IntentsAndSlots(test_raw, lang, tokenizer)
 
-    # Crea i Dataloader
-    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, collate_fn=collate_fn)
+    # Dataloader instantiations
+    train_loader = DataLoader(train_dataset, batch_size=128, collate_fn=collate_fn, shuffle=True)
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=collate_fn)
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=collate_fn)
+
+    out_slot = len(lang.slot2id)
+    out_int = len(lang.intent2id)
+    vocab_len = len(lang.word2id)
 
     # ===== Training Params =====
     hid_size = 200
@@ -85,17 +66,12 @@ if __name__ == "__main__":
     all_intent_accs = []
     best_model = None
 
-    out_slot = len(lang.slot2id)
-    out_int = len(lang.intent2id)
-    vocab_len = len(lang.word2id)
-    
     # Train loop
     for x in tqdm(range(0, runs)):
         model = BERT(hid_size, out_slot, out_int, emb_size, vocab_len, pad_index=PAD_TOKEN).to(device)
         model.apply(init_weights)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
         criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
         criterion_intents = nn.CrossEntropyLoss()
         
@@ -111,16 +87,16 @@ if __name__ == "__main__":
                 losses_dev.append(np.asarray(loss_dev).mean())
                 
                 f1 = results_dev['total']['f']
-                # For decreasing the patience you can also use the average between slot f1 and intent accuracy
                 if f1 > best_f1:
                     best_f1 = f1
-                    # Here you should save the model
+                    best_model = copy.deepcopy(model)  # Salva il modello migliore
                     patience = 3
                 else:
                     patience -= 1
                 if patience <= 0: # Early stopping with patience
-                    break # Not nice but it keeps the code clean
+                    break
 
+        # Evaluation on the test set
         results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, model, lang) 
         intent_acc.append(intent_test['accuracy'])
         slot_f1s.append(results_test['total']['f'])
@@ -131,7 +107,7 @@ if __name__ == "__main__":
     print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
 
     # ==== Save Results ====
-    model_name = f"BERT_lr{lr}_ADAMW_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
+    model_name = f"BERT_lr{lr}_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"
     result_path = os.path.join("Results", model_name)
     os.makedirs(result_path, exist_ok=True)
     print(f"Results saved in {result_path}")
@@ -139,13 +115,12 @@ if __name__ == "__main__":
     # ===== Save Model, Tokenizer, and Label Mappings =====
     print("Salvataggio del modello, tokenizer e mappature delle etichette...")
 
-    # Salva il modello fine-tunato
+    # Salva il modello
     model_path = os.path.join(result_path, "bert_model")
-    best_model.save_pretrained(model_path)
+    torch.save(best_model.state_dict(), model_path)
 
     # Salva il tokenizer
     tokenizer_path = os.path.join(result_path, "bert_tokenizer")
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     tokenizer.save_pretrained(tokenizer_path)
 
     # Salva le mappature delle etichette
