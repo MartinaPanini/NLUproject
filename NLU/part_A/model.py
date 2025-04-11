@@ -24,36 +24,46 @@ class ModelIAS(nn.Module):
         self.slot_out = nn.Linear(hid_size, out_slot)
         self.intent_out = nn.Linear(hid_size, out_int)
 
-def forward(self, utterance, seq_lengths):
-        # utterance.size() = batch_size X seq_len
-        utt_emb = self.embedding(utterance) # utt_emb.size() = batch_size X seq_len X emb_size
-        
-        # pack_padded_sequence avoid computation over pad tokens reducing the computational cost
-        
-        packed_input = pack_padded_sequence(utt_emb, seq_lengths.cpu().numpy(), batch_first=True)
-        # Process the batch
-        packed_output, (last_hidden, cell) = self.utt_encoder(packed_input) 
+    def forward(self, utterance, seq_lengths):
+            # utterance.size() = batch_size X seq_len
+            utt_emb = self.embedding(utterance) # utt_emb.size() = batch_size X seq_len X emb_size
+            
+            # pack_padded_sequence avoid computation over pad tokens reducing the computational cost
+            
+            packed_input = pack_padded_sequence(utt_emb, seq_lengths.cpu().numpy(), batch_first=True)
+            # Process the batch
+            packed_output, (last_hidden, cell) = self.utt_encoder(packed_input) 
 
-        # Unpack the sequence
-        utt_encoded, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
+            # Unpack the sequence
+            utt_encoded, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
 
-        # Apply dropout
-        if self.isDropout:
-            utt_encoded = self.dropout(utt_encoded)
+            # Apply dropout
+            if self.isDropout:
+                utt_encoded = self.dropout(utt_encoded)
 
-        # Get the last hidden state
-        if self.utt_encoder.bidirectional:
-            last_hidden = torch.cat((last_hidden[0], last_hidden[1]), dim=1)
-        else:
-            last_hidden = last_hidden[-1,:,:]
-        
-        # Compute slot logits
-        slots = self.slot_out(utt_encoded)
-        # Compute intent logits
-        intent = self.intent_out(last_hidden)
-        
-        # Slot size: batch_size, seq_len, classes 
-        slots = slots.permute(0,2,1) # We need this for computing the loss
-        # Slot size: batch_size, classes, seq_len
-        return slots, intent
+            # Get the last hidden state
+            if self.utt_encoder.bidirectional:
+                last_hidden = torch.cat((last_hidden[0], last_hidden[1]), dim=1)
+            else:
+                last_hidden = last_hidden[-1,:,:]
+            
+            # Compute slot logits
+            slots = self.slot_out(utt_encoded)
+            # Compute intent logits
+            intent = self.intent_out(last_hidden)
+            
+            # Slot size: batch_size, seq_len, classes 
+            slots = slots.permute(0,2,1) # We need this for computing the loss
+            # Slot size: batch_size, classes, seq_len
+            return slots, intent
+
+def init_weights(m):
+    if isinstance(m, nn.Linear) or isinstance(m, nn.Embedding):
+        nn.init.xavier_uniform_(m.weight.data)
+    if isinstance(m, (nn.LSTM, nn.GRU)):
+        for name, param in m.named_parameters():
+            if 'weight' in name:
+                nn.init.xavier_uniform_(param.data)
+            elif 'bias' in name:
+                param.data.fill_(0)
 

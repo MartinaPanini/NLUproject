@@ -1,9 +1,6 @@
 from functions import *
 from utils import *
 from model import *
-from conll import evaluate
-from sklearn.metrics import classification_report
-import random
 import numpy as np
 from sklearn.model_selection import train_test_split
 from collections import Counter
@@ -14,7 +11,7 @@ from tqdm import tqdm
 import os
 import matplotlib.pyplot as plt
 import copy
-import json
+
 
 if __name__ == "__main__":
 
@@ -90,8 +87,7 @@ if __name__ == "__main__":
 
     # Train loop
     for x in tqdm(range(0, runs)):
-        model = ModelIAS(hid_size, out_slot, out_int, emb_size, 
-                        vocab_len, pad_index=PAD_TOKEN, isDropout=dropout, isBidirectional=bidirectional).to(device)
+        model = ModelIAS(hid_size, out_slot, out_int, emb_size, vocab_len, pad_index=PAD_TOKEN, isDropout=dropout, isBidirectional=bidirectional).to(device)
         model.apply(init_weights)
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -122,13 +118,15 @@ if __name__ == "__main__":
         
         best_model.to(device)
 
-        results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, model, lang)
+        results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, best_model, lang)
         intent_acc.append(intent_test['accuracy'])
         slot_f1s.append(results_test['total']['f'])
+
     slot_f1s = np.asarray(slot_f1s)
     intent_acc = np.asarray(intent_acc)
-    # print('Slot F1', round(slot_f1s.mean(),3), '+-', round(slot_f1s.std(),3))
-    # print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
+    print('Slot F1', round(slot_f1s.mean(), 3), '+-', round(slot_f1s.std(), 3))
+    print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
+   
 
     # ==== Save Results ====
     if dropout and  (not bidirectional):
@@ -143,17 +141,15 @@ if __name__ == "__main__":
     os.makedirs(result_path, exist_ok=True)
 
     # ==== Plot Losses ====
-    plt.figure(figsize=(15, 6))
-    plt.plot(sampled_epochs, losses_train, label='Train Loss', marker='o')
-    plt.plot(sampled_epochs, losses_dev, label='Dev Loss', marker='s')
+    plt.figure(figsize=(10, 5))
+    plt.plot(sampled_epochs, losses_train, label='Training Loss', marker='o')
+    plt.plot(sampled_epochs, losses_dev, label='Validation Loss', marker='s')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title(f'Training and Dev Loss {model_name}')
+    plt.title(f'Training vs Validation Loss - {model_name}' if model_name else 'Training vs Validation Loss')
     plt.legend()
     plt.grid(True)
-    plt.tight_layout()
     plt.savefig(os.path.join(result_path, "loss_plot.png"))
-    plt.close()
 
     # ===== Report =====
     results_txt = os.path.join(result_path, f"results_{model_name}.txt")
@@ -164,8 +160,8 @@ if __name__ == "__main__":
         file.write(f'lr: {lr} \n')
         file.write(f'hidden_size: {hid_size} \n')
         file.write(f'embedding_size: {emb_size} \n')
-        file.write(f'Slot F1: {round(np.mean(slot_f1s), 3)} ± {round(np.std(slot_f1s), 3)} \n')
-        file.write(f'Intent Accuracy: {round(np.mean(intent_acc), 3)} ± {round(np.std(intent_acc), 3)} \n')
+        file.write(f"Slot F1: {round(np.mean(slot_f1s), 3)} +/- {round(np.std(slot_f1s), 3)} \n")
+        file.write(f"Intent Accuracy: {round(np.mean(intent_acc), 3)} +/- {round(np.std(intent_acc), 3)} \n")
         file.write(f"Best dev F1: {round(best_f1, 3)}\n")
         file.close()
 
