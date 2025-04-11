@@ -48,57 +48,99 @@ class Lang():
                 vocab[elem] = len(vocab)
         return vocab
 
-class IntentsAndSlots(data.Dataset):
-    def __init__(self, dataset, lang, unk='unk'):
+class IntentsAndSlots (data.Dataset):
+    # Mandatory methods are __init__, __len__ and __getitem__
+    def __init__(self, dataset, lang, tokenizer, unk='unk'):
         self.utterances = []
         self.intents = []
         self.slots = []
+        self.tokenizer = tokenizer
         self.unk = unk
-        
-        for x in dataset:
-            # Tokenizza la frase usando BertTokenizerFast
-            tokenized = tokenizer(x['utterance'], padding='max_length', truncation=True, max_length=64, return_tensors='pt')
-            input_ids = tokenized['input_ids'].squeeze().tolist()  # Rimuove la dimensione extra
-            self.utterances.append(input_ids)
-            
-            # Gestione della sub-tokenizzazione per gli slot
-            label_ids = []
-            previous_word_id = None
-            for word_label, word_ids in zip(x['slots'], tokenized.word_ids()):
-                if word_ids is None:
-                    label_ids.append(-100)  # Etichetta speciale per il padding
-                elif word_ids != previous_word_id:
-                    # Aggiungi l'etichetta per il token corrispondente
-                    label_ids.append(lang.slot2id.get(word_label, lang.slot2id[self.unk]))  
-                    previous_word_id = word_ids
-                else:
-                    # Se è un sub-token (parte di una parola) non aggiungere etichetta
-                    label_ids.append(-100)
-            
-            # Se la lunghezza della lista delle etichette degli slot è diversa dalla lunghezza dei token,
-            # completa con etichette di padding (-100).
-            label_ids = label_ids + [-100] * (len(input_ids) - len(label_ids))
-            self.slots.append(label_ids)
 
+        for x in dataset:
+            self.utterances.append(x['utterance'])
+            self.slots.append(x['slots'])
             self.intents.append(x['intent'])
 
-        self.slot_ids = self.slots
+        # Mappa le intent usando la mappa delle intent
         self.intent_ids = self.mapping_lab(self.intents, lang.intent2id)
+
+        # Mappa le sequenze: utterance tokenizzate, slot IDs, attention mask, e token type IDs
+        self.utt_ids, self.slot_ids, self.attention_mask, self.token_id = self.mapping_seq(
+            self.utterances, self.slots, lang.slot2id
+        )
 
     def __len__(self):
         return len(self.utterances)
 
     def __getitem__(self, idx):
-        utt = torch.Tensor(self.utterances[idx])
+        utt = torch.Tensor(self.utt_ids[idx])
         slots = torch.Tensor(self.slot_ids[idx])
         intent = self.intent_ids[idx]
         sample = {'utterance': utt, 'slots': slots, 'intent': intent}
         return sample
-
-    # Mapping dei label
+    
+    # Auxiliary methods
+    
     def mapping_lab(self, data, mapper):
         return [mapper[x] if x in mapper else mapper[self.unk] for x in data]
 
+    #########
+    # N.B → we use BERT to get word ID (token)
+    #       we use LANG to obtain the ID about the slots and intents
+    #
+    # token_id = 0 if the token belong to the same sentence
+    #            I can do this since in this case I'm not compering two sentences 
+    #            Finally CLS and SEP are still present
+    # subtoken → since a word can be splitted into more than one token
+    #            I need to handle it. I assign the slop based on the first token
+    #            and 'pad' to all the other subtokens in order to have the same length
+    #########
+
+    def mapping_seq(self, utterrance, slots, slot_mapper):
+        res_utterrance = []
+        res_slots = []
+        res_attention_mask = []
+        res_token_id = []
+
+        for seq, slot in zip(utterrance, slots):
+            tmp_utterance = []
+            tmp_slots = []
+            tmp_attention_mask = []
+            tmp_token_type_id = []
+            for word, element in zip(seq.split(), slot.split()):
+
+                # tokenize word without special tokens
+                #word_tokens = self.tokenizer(word, add_special_tokens=False)
+                word_tokens = self.tokenizer(word)
+                tmp_utterance.extend(word_tokens["input_ids"])
+                
+                #ad the id to the first token/word and the pad one for all the other tokens
+                tmp_slots.append(slot_mapper[element])
+                tmp_slots.extend([slot_mapper['pad']] * (len(word_tokens["input_ids"]) - 1))
+
+
+                # attention mask and token type id 
+                for i in range(len(word_tokens["input_ids"])):
+                    tmp_attention_mask.append(1)
+                    tmp_token_type_id.append(0)
+
+        res_utterrance.append(tmp_utterance)
+        res_slots.append(tmp_slots)
+        res_attention_mask.append(tmp_attention_mask)
+        res_token_id.append(tmp_token_type_id)
+
+        return res_utterrance, res_slots, res_attention_mask, res_token_id
+    '''
+    # tokenization with Bert
+    def mapping_seq(self, data, mapper): # Map sequences to number
+        res = []
+        for seq in data:
+            tokens = self.tokenizer.tokenize(seq)
+            tmp_seq = [mapper[token] if token in mapper else mapper[self.unk] for token in tokens]
+            res.append(tmp_seq)
+        return res
+    '''
 def collate_fn(data):
     def merge(sequences):
         '''
@@ -124,9 +166,9 @@ def collate_fn(data):
     intent = torch.LongTensor(new_item["intent"])
 
     # Build attention mask
-    attention_mask = torch.LongTensor([[1 if i != 0 else 0 for i in seq] for seq in src_utt])
+    attention_mask, _ = merge(new_item['attetnion_mask'])
     # Build token type ids
-    token_type_ids = torch.LongTensor([[0 for i in seq] for seq in src_utt])
+    token_type_ids,_ = merge(new_item['token_type_ids'])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     src_utt = src_utt.to(device)
