@@ -32,109 +32,110 @@ if __name__ == "__main__":
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
 ####################################################################################################################################################################
-    hid_sizes = [300]
-    emb_sizes = [500]
-    lrs = [5] 
-    clips = [5]
-    n_epochs_list = [100]
-    patience_list = [5]
-    batch_train_list = [64]
-    batch_dev_test_list = [128]
-    NON_MONOTONE_INTERVAL = 5
+    hid_size = 300
+    emb_size = 500
+    lr = 3
+    clip = 5
+    n_epochs = 100
+    patience = 5
+    batch_train = 64
+    batch_dev_test = 128
 ####################################################################################################################################################################
-    for hid_size, emb_size, lr, clip, n_epochs, patience, batch_train, batch_dev_test in itertools.product(
-                hid_sizes, emb_sizes, lrs, clips, n_epochs_list, patience_list, batch_train_list, batch_dev_test_list):
-        vocab_len = len(lang.word2id)
-        
-        model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-
-        optimizer = optim.SGD(model.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.75)
-        criterion_train = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"])
-        criterion_eval = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"], reduction='sum')
-
-        losses_train = []
-        losses_dev = []
-        sampled_epochs = []
-        perplexities = []
-        best_ppl = math.inf
-        best_loss = math.inf
-        best_val_loss = []
-        best_model = None
-        pbar = tqdm(range(1,n_epochs+1))
-       
-        for epoch in pbar: # Use this also as stopping criterion for NT-AvSGD
-            loss = train_loop(train_loader, optimizer, criterion_train, model, clip)    
-
-            if epoch % 1 == 0:  # validate every epoch
-                sampled_epochs.append(epoch)
-                losses_train.append(np.asarray(loss).mean())
-                
-                if 't0' in optimizer.param_groups[0]:       # Triggered
-                    tmp = {}
-                    for prm in model.parameters():
-                        tmp[prm] = prm.data.clone()
-                        prm.data = optimizer.state[prm]['ax'].clone()
-                    
-                    ppl_dev, loss_dev = eval_loop(dev_loader, criterion_eval, model)        # evaluate the model
-                    
-                    for prm in model.parameters():
-                        prm.data = tmp[prm].clone()
-                    
-                else:                                       # ASGD not triggered
-                    ppl_dev, loss_dev = eval_loop(dev_loader, criterion_eval, model)        # evaluate the model
-                    
-                    if loss_dev < best_loss:
-                        best_loss = loss_dev
-                    
-                    # check if not usign AvSDD, than check for non-monotonicity
-                    if 't0' not in optimizer.param_groups[0] and (len(best_val_loss) > NON_MONOTONE_INTERVAL and loss_dev > min(best_val_loss[:-NON_MONOTONE_INTERVAL])):
-                        print("Triggered, switching to ASGD")
-                        optimizer = optim.ASGD(model.parameters(), lr=lr, t0=0,  lambd=0.)
-                
-                    best_val_loss.append(loss_dev)
-                    
-                losses_dev.append(np.asarray(loss_dev).mean())
-                perplexities.append(ppl_dev)
-                pbar.set_description(f"PPL: {ppl_dev:.2f} | LR: {lr:.5f} | hid_size: {hid_size} | emb_size: {emb_size} | batch_train: {batch_train} | batch_dev_test: {batch_dev_test}")
-
-                if  ppl_dev < best_ppl: 
-                    best_ppl = ppl_dev
-                    best_model = copy.deepcopy(model).to(device)
-                    patience = patience
-                else:
-                    patience -= 1
-                    
-                if patience <= 0: # Early stopping with patience
-                    break # Not nice but it keeps the code clean
-                    # Incrementa il contatore k (Riga 12 dell'algoritmo)
-            scheduler.step()
-        
-        best_model.to(device)
-        final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
-        print('Test ppl: ', final_ppl)
-
-        model_name = f"LSTM_NTAvSGD_PPL_{final_ppl:.2f}_LR_{lr}"
-        # Save the results
-        result_path=os.path.join("Results", model_name)
-        os.makedirs(result_path, exist_ok=True)
-
-        with open(os.path.join(result_path, f"results_{model_name}.txt"), "a") as f:
-            f.write(f"\n{model_name}\n\n")
-            f.write(f"hid_size={hid_size}, \nemb_size={emb_size}, \nlr={lr}, \nclip={clip}, \nn_epochs={n_epochs}, \npatience={patience}, \nbatch_train={batch_train}, \nbatch_dev_test={batch_dev_test}, \ntest_ppl={final_ppl}\n")
+    vocab_len = len(lang.word2id)
     
+    #model = LM_LSTM_WT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    model = LM_LSTM_VD(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    model.apply(init_weights)
 
-        # Loss plot
-        loss_dir = os.path.dirname(os.path.join(result_path, "loss_plot.png"))
-        os.makedirs(loss_dir, exist_ok=True)
-        loss_path = os.path.join(result_path, "loss_plot.png")
-        plot_loss(sampled_epochs, losses_train, losses_dev, loss_path, model_name=model_name)
-        # Perplexity plot
-        ppl_dir = os.path.dirname(os.path.join(result_path, "perplexity_plot.png"))
-        os.makedirs(ppl_dir, exist_ok=True)
-        ppl_path = os.path.join(result_path, "perplexity_plot.png")
-        plot_perplexity(sampled_epochs, perplexities, ppl_path, model_name=model_name)
+    optimizer = optim.SGD(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.75)
+    criterion_train = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"])
+    criterion_eval = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"], reduction='sum')
 
-        # To save the model
-        path = os.path.join(result_path, f'{model_name}.pt')
-        torch.save(model.state_dict(), path)
+    n = 5
+    losses_train = []
+    losses_dev = []
+    sampled_epochs = []
+    perplexities = []
+    best_ppl = math.inf
+    best_loss = math.inf
+    best_val_loss = []
+    best_model = None
+    pbar = tqdm(range(1,n_epochs+1))
+    
+    for epoch in pbar: 
+        loss = train_loop(train_loader, optimizer, criterion_train, model, clip)    
+
+        if epoch % 1 == 0:  # validate every epoch
+            sampled_epochs.append(epoch)
+            losses_train.append(np.asarray(loss).mean())
+            
+            if 't0' in optimizer.param_groups[0]:       # Triggered
+                tmp = {}
+                for prm in model.parameters():
+                    tmp[prm] = prm.data.clone()
+                    prm.data = optimizer.state[prm]['ax'].clone()
+                
+                ppl_dev, loss_dev = eval_loop(dev_loader, criterion_eval, model)   
+                perplexities.append(ppl_dev)
+                losses_dev.append(np.asarray(loss_dev).mean())
+                
+                # Restore original weights
+                for prm in model.parameters():
+                    prm.data = tmp[prm].clone()
+                
+            else:                                       # ASGD not triggered
+                ppl_dev, loss_dev = eval_loop(dev_loader, criterion_eval, model)
+                perplexities.append(ppl_dev)
+                losses_dev.append(np.asarray(loss_dev).mean())       # evaluate the model
+                
+                if (len(perplexities)>n and ppl_dev > min(perplexities[:-n])):
+                    print('Switching to ASGD')
+                    #lr/10
+                    opt_method = torch.optim.ASGD(model.parameters(), lr=lr, t0=0, lambd=0., weight_decay=1.2e-6,)
+                if loss_dev < best_loss:
+                    best_loss = loss_dev
+            
+            
+                best_val_loss.append(loss_dev)
+                
+            pbar.set_description(f"PPL: {ppl_dev:.2f} | LR: {lr:.5f} | hid_size: {hid_size} | emb_size: {emb_size} | batch_train: {batch_train} | batch_dev_test: {batch_dev_test}")
+
+            if  ppl_dev < best_ppl: 
+                best_ppl = ppl_dev
+                best_model = copy.deepcopy(model).to(device)
+                patience = patience
+            else:
+                patience -= 1
+                
+            if patience <= 0: # Early stopping with patience
+                break # Not nice but it keeps the code clean
+    
+    best_model.to(device)
+    final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
+    print('Test ppl: ', final_ppl)
+
+    model_name = f"LSTM_VD_NTAvSGD_PPL_{final_ppl:.2f}_LR_{lr}"
+    # Save the results
+    result_path=os.path.join("Results", model_name)
+    os.makedirs(result_path, exist_ok=True)
+
+    with open(os.path.join(result_path, f"results_{model_name}.txt"), "a") as f:
+        f.write(f"\n{model_name}\n\n")
+        f.write(f"hid_size={hid_size}, \nemb_size={emb_size}, \nlr={lr}, \nclip={clip}, \nn_epochs={n_epochs}, \npatience={patience}, \nbatch_train={batch_train}, \nbatch_dev_test={batch_dev_test}, \ntest_ppl={final_ppl}\n")
+
+
+    # Loss plot
+    loss_dir = os.path.dirname(os.path.join(result_path, "loss_plot.png"))
+    os.makedirs(loss_dir, exist_ok=True)
+    loss_path = os.path.join(result_path, "loss_plot.png")
+    plot_loss(sampled_epochs, losses_train, losses_dev, loss_path, model_name=model_name)
+    # Perplexity plot
+    ppl_dir = os.path.dirname(os.path.join(result_path, "perplexity_plot.png"))
+    os.makedirs(ppl_dir, exist_ok=True)
+    ppl_path = os.path.join(result_path, "perplexity_plot.png")
+    plot_perplexity(sampled_epochs, perplexities, ppl_path, model_name=model_name)
+
+    # To save the model
+    path = os.path.join(result_path, f'{model_name}.pt')
+    torch.save(model.state_dict(), path)

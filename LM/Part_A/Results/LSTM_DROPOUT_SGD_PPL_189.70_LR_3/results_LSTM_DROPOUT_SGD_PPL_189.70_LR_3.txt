@@ -1,0 +1,12 @@
+
+LSTM_DROPOUT_SGD_PPL_189.70_LR_3
+
+hid_size=300, 
+emb_size=500, 
+lr=3, 
+clip=5, 
+n_epochs=100, 
+patience=0, 
+batch_train=64, 
+batch_dev_test=128, 
+test_ppl=189.6998931142304
