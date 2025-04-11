@@ -13,13 +13,13 @@ from tqdm import tqdm
 import os
 import matplotlib.pyplot as plt
 import copy
-from transformers import BertConfig, get_linear_schedule_with_warmup  # Importa lo scheduler
+from transformers import BertConfig, BertTokenizer  # Importa lo scheduler
 import json  # Aggiunto per il salvataggio delle mappature
 
 if __name__ == "__main__":
 
     bert = BertConfig.from_pretrained("bert-base-uncased")
-
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     PAD_TOKEN = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -58,9 +58,9 @@ if __name__ == "__main__":
     lang = Lang(words, intents, slots, cutoff=0)
 
     # Crea i dataset
-    train_dataset = IntentsAndSlots(train_raw, lang)
-    dev_dataset = IntentsAndSlots(dev_raw, lang)
-    test_dataset = IntentsAndSlots(test_raw, lang)
+    train_dataset = IntentsAndSlots(train_raw, lang, tokenizer)
+    dev_dataset = IntentsAndSlots(dev_raw, lang, tokenizer)
+    test_dataset = IntentsAndSlots(test_raw, lang, tokenizer)
 
     # Crea i Dataloader
     train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, collate_fn=collate_fn)
@@ -83,51 +83,45 @@ if __name__ == "__main__":
     ignore_list = 102
     all_slot_f1s = []
     all_intent_accs = []
+    best_model = None
 
     out_slot = len(lang.slot2id)
     out_int = len(lang.intent2id)
     vocab_len = len(lang.word2id)
-
+    
     # Train loop
     for x in tqdm(range(0, runs)):
-        model = BERT(bert, out_slot, out_int, ignore_list).to(device)
-        optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)  
+        model = BERT(hid_size, out_slot, out_int, emb_size, vocab_len, pad_index=PAD_TOKEN).to(device)
+        model.apply(init_weights)
 
-        # Define scheduler for learning rate
-        total_steps = len(train_loader) * n_epochs  # Total steps for training
-        scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                    num_warmup_steps=0,  # You can adjust this for warmup
-                                                    num_training_steps=total_steps)
-
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+        #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
         criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
         criterion_intents = nn.CrossEntropyLoss()
-
+        
         slot_f1s, intent_acc = [], []
-
-        for epoch in range(1, n_epochs + 1):  # Loop over epochs
-            loss = train_loop(train_loader, optimizer, criterion_slots, criterion_intents, model)
-            scheduler.step()  # Step the scheduler after every batch update
-
-            if epoch % 5 == 0:
-                sampled_epochs.append(epoch)
+        for x in tqdm(range(1,n_epochs)):
+            loss = train_loop(train_loader, optimizer, criterion_slots, 
+                            criterion_intents, model, clip=clip)
+            if x % 5 == 0: # We check the performance every 5 epochs
+                sampled_epochs.append(x)
                 losses_train.append(np.asarray(loss).mean())
-                results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, criterion_intents, model, lang)
+                results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, 
+                                                            criterion_intents, model, lang)
                 losses_dev.append(np.asarray(loss_dev).mean())
+                
                 f1 = results_dev['total']['f']
-
+                # For decreasing the patience you can also use the average between slot f1 and intent accuracy
                 if f1 > best_f1:
                     best_f1 = f1
-                    best_model = copy.deepcopy(model).to(device)
+                    # Here you should save the model
                     patience = 3
                 else:
                     patience -= 1
-                if patience <= 0:  # Early stopping with patience
-                    break  # Stop training early if patience is exceeded
+                if patience <= 0: # Early stopping with patience
+                    break # Not nice but it keeps the code clean
 
-        best_model.to(device)
-
-        # Evaluate on the test set after training
-        results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, best_model, lang)
+        results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, model, lang) 
         intent_acc.append(intent_test['accuracy'])
         slot_f1s.append(results_test['total']['f'])
 
