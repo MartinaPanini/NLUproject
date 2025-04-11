@@ -1,0 +1,12 @@
+
+LSTM_VD_NTAvSGD_PPL_137.84_LR_3
+
+hid_size=300, 
+emb_size=500, 
+lr=3, 
+clip=5, 
+n_epochs=100, 
+patience=0, 
+batch_train=64, 
+batch_dev_test=128, 
+test_ppl=137.84400250977748

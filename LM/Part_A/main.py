@@ -34,15 +34,15 @@ if __name__ == "__main__":
 ####################################################################################################################################################################
     hid_size = 300
     emb_size = 500
-    lrs = [0.001, 0.0001] # for AdamW
-    #lrs = [0.1, 1, 3] # for SGD
+    #lrs = [0.001, 0.0001] # for AdamW
+    lrs = [1, 3] # for SGD
     clip = 5
     n_epochs = 100
     patience = 5
     batch_train = 64
     batch_dev_test = 128
 ####################################################################################################################################################################
-    for lr in itertools.product(lrs):
+    for lr in lrs:
         vocab_len = len(lang.word2id)
         
         #model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
@@ -50,8 +50,8 @@ if __name__ == "__main__":
         model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
         model.apply(init_weights)
 
-        #optimizer = optim.SGD(model.parameters(), lr=lr)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+        optimizer = optim.SGD(model.parameters(), lr=lr)
+        #optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
         criterion_train = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"])
         criterion_eval = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"], reduction='sum')
 
