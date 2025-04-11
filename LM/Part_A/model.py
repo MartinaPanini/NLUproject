@@ -43,25 +43,20 @@ class LM_LSTM_DROPOUT(nn.Module):
     def __init__(self, emb_size, hidden_size, output_size, pad_index=0, out_dropout=0.1,
                  emb_dropout=0.1, n_layers=1):
         super(LM_LSTM_DROPOUT, self).__init__()
-        # Token ids to vectors
         self.embedding = nn.Embedding(output_size, emb_size, padding_idx=pad_index)
+        # Dropout layer
         self.emb_dropout = nn.Dropout(emb_dropout)
-        
-        # LSTM layer replacing RNN
         self.lstm = nn.LSTM(emb_size, hidden_size, n_layers, bidirectional=False, 
                             batch_first=True, dropout=out_dropout if n_layers > 1 else 0)
-        
         self.pad_token = pad_index
-        
+        #Dropout layer
         self.out_dropout = nn.Dropout(out_dropout)
         self.output = nn.Linear(hidden_size, output_size)
         
     def forward(self, input_sequence):
         emb = self.embedding(input_sequence)
-        emb = self.emb_dropout(emb)
-        
-        lstm_out, _ = self.lstm(emb)
-        lstm_out = self.out_dropout(lstm_out)
-        
-        output = self.output(lstm_out).permute(0, 2, 1)
+        drop1 = self.emb_dropout(emb)
+        lstm_out, _ = self.lstm(drop1)
+        drop2 = self.dropout(lstm_out)
+        output = self.output(drop2).permute(0,2,1)
         return output
