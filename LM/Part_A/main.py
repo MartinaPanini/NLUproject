@@ -32,18 +32,17 @@ if __name__ == "__main__":
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
 ####################################################################################################################################################################
-    hid_sizes = [100]
-    emb_sizes = [300]
+    hid_size = 300
+    emb_size = 500
     lrs = [0.001, 0.0001] # for AdamW
     #lrs = [0.1, 1, 3] # for SGD
-    clips = [5]
-    n_epochs_list = [100]
-    patience_list = [3]
-    batch_train_list = [64]
-    batch_dev_test_list = [128]
+    clip = 5
+    n_epochs = 100
+    patience = 5
+    batch_train = 64
+    batch_dev_test = 128
 ####################################################################################################################################################################
-    for hid_size, emb_size, lr, clip, n_epochs, patience, batch_train, batch_dev_test in itertools.product(
-                hid_sizes, emb_sizes, lrs, clips, n_epochs_list, patience_list, batch_train_list, batch_dev_test_list):
+    for lr in itertools.product(lrs):
         vocab_len = len(lang.word2id)
         
         #model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
