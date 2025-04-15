@@ -23,8 +23,8 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tmp_train_raw = load_data(os.path.join('dataset/ATIS/train.json'))
-    test_raw = load_data(os.path.join('dataset/ATIS/test.json'))
+    tmp_train_raw = load_data('/Users/martinapanini/Library/Mobile Documents/com~apple~CloudDocs/Università/II Semestre/NaturalLanguageUnderstanding/NLUproject/NLU/part_B/dataset/ATIS/train.json')
+    test_raw = load_data('/Users/martinapanini/Library/Mobile Documents/com~apple~CloudDocs/Università/II Semestre/NaturalLanguageUnderstanding/NLUproject/NLU/part_B/dataset/ATIS/test.json')
 
     portion = 0.10
     intents = [x['intent'] for x in tmp_train_raw]
