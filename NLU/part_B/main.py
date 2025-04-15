@@ -23,8 +23,8 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tmp_train_raw = load_data('/Users/martinapanini/Library/Mobile Documents/com~apple~CloudDocs/Università/II Semestre/NaturalLanguageUnderstanding/NLUproject/NLU/part_B/dataset/ATIS/train.json')
-    test_raw = load_data('/Users/martinapanini/Library/Mobile Documents/com~apple~CloudDocs/Università/II Semestre/NaturalLanguageUnderstanding/NLUproject/NLU/part_B/dataset/ATIS/test.json')
+    tmp_train_raw = load_data('dataset/ATIS/train.json')
+    test_raw = load_data('dataset/ATIS/test.json')
 
     portion = 0.10
     intents = [x['intent'] for x in tmp_train_raw]
@@ -73,8 +73,7 @@ if __name__ == "__main__":
     lr = 0.0001
     clip = 5
     n_epochs = 200
-    runs = 5
-    patience = 3
+    patience = 5
 
     losses_train = []
     losses_dev = []
@@ -106,17 +105,17 @@ if __name__ == "__main__":
             results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, criterion_intents, model, lang, tokenizer)
             losses_dev.append(np.asarray(loss_dev).mean())
             f1 = results_dev['total']['f']
+            print(f"f1 {f1}\n")
+            print(f"best f1 {best_f1}")
 
             if f1 > best_f1:
                 best_f1 = f1
                 best_model = copy.deepcopy(model).to(device)
-                patience = 3
+                patience = patience
             else:
                 patience -= 1
             if patience <= 0: # Early stopping with patient
                 break # Not nice but it keeps the code clean
-    
-    best_model.to(device)
 
     results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, criterion_intents, best_model, lang, tokenizer)
     intent_acc.append(intent_test['accuracy'])
@@ -124,10 +123,7 @@ if __name__ == "__main__":
 
     slot_f1s = np.asarray(slot_f1s)
     intent_acc = np.asarray(intent_acc)
-    print('Slot F1', round(slot_f1s.mean(), 3), '+-', round(slot_f1s.std(), 3))
-    print('Intent Acc', round(intent_acc.mean(), 3), '+-', round(slot_f1s.std(), 3))
-   
-
+    
     # ==== Save Results ====
    
     model_name = f"BERT_F1_{round(np.mean(slot_f1s), 3)}_INTACC_{round(np.mean(intent_acc), 3)}"

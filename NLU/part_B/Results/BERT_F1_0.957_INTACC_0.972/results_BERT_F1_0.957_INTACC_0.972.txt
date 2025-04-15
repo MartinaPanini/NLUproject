@@ -1,0 +1,11 @@
+BERT_F1_0.957_INTACC_0.972
+
+epochs used: 14 
+number epochs: 200 
+lr: 0.0001 
+hidden_size: 768 
+embedding_size: 300 
+Slot F1: 0.957 +/- 0.0 
+Intent Accuracy: 0.972 +/- 0.0 
+Best dev F1: 0.983
+Optimizer: Adam
