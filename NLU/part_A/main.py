@@ -20,8 +20,8 @@ if __name__ == "__main__":
     PAD_TOKEN = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tmp_train_raw = load_data('/teamspace/studios/this_studio/NLUproject/NLU/part_A/dataset/ATIS/train.json')
-    test_raw = load_data('/teamspace/studios/this_studio/NLUproject/NLU/part_A/dataset/ATIS/test.json')
+    tmp_train_raw = load_data('/dataset/ATIS/train.json')
+    test_raw = load_data('/dataset/ATIS/test.json')
 
     portion = 0.10
     intents = [x['intent'] for x in tmp_train_raw]
