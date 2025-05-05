@@ -15,9 +15,6 @@ def load_data(path):
         dataset = json.loads(f.read())
     return dataset
 
-tmp_train_raw = load_data(os.path.join('dataset','ATIS','train.json'))
-test_raw = load_data(os.path.join('dataset','ATIS','test.json'))
-
 class Lang():
     def __init__(self, words, intents, slots, cutoff=0):
         self.word2id = self.w2id(words, cutoff=cutoff, unk=True)

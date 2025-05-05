@@ -1,0 +1,10 @@
+IAS_lr0.0001_ADAM_F1_0.903_INTACC_0.932
+
+epochs used: 43 
+number epochs: 200 
+lr: 0.0001 
+hidden_size: 200 
+embedding_size: 300 
+Slot F1: 0.903 +/- 0.0 
+Intent Accuracy: 0.932 +/- 0.0 
+Best dev F1: 0.95
