@@ -38,8 +38,10 @@ if __name__ == "__main__":
     clip = 5
     n_epochs = 100
     patience = 5
+    patience_AvSGD = 5
     batch_train = 64
     batch_dev_test = 128
+    NTAvSGD = True
 ####################################################################################################################################################################
     vocab_len = len(lang.word2id)
     
@@ -90,17 +92,20 @@ if __name__ == "__main__":
                 perplexities.append(ppl_dev)
                 losses_dev.append(np.asarray(loss_dev).mean())       # evaluate the model
                 
-                if (len(perplexities)>n and ppl_dev > min(perplexities[:-n])):
-                    print('Switching to ASGD')
-                    #lr/10
-                    opt_method = torch.optim.ASGD(model.parameters(), lr=lr, t0=0, lambd=0., weight_decay=1.2e-6,)
+                if (NTAvSGD):
+                    if len(best_val_loss)>n and loss_dev > min(best_val_loss[:-n]):
+                        print('Switching to ASGD')
+                        patience = patience_AvSGD
+                        lr = lr*0.4
+                        optimizer.param_groups[0]['lr'] = lr
+                        optimizer = torch.optim.ASGD(model.parameters(), lr=lr, t0=0, lambd=0., weight_decay=1.2e-6,)
                 if loss_dev < best_loss:
                     best_loss = loss_dev
             
             
                 best_val_loss.append(loss_dev)
                 
-            pbar.set_description(f"PPL: {ppl_dev:.2f} | LR: {lr:.5f} | hid_size: {hid_size} | emb_size: {emb_size} | batch_train: {batch_train} | batch_dev_test: {batch_dev_test}")
+            pbar.set_description(f"PPL: {ppl_dev:.2f} | LR: {lr:.5f} | hid_size: {hid_size} | emb_size: {emb_size} | batch_train: {batch_train} | batch_dev_test: {batch_dev_test} | patience: {patience} ")
 
             if  ppl_dev < best_ppl: 
                 best_ppl = ppl_dev
@@ -116,7 +121,7 @@ if __name__ == "__main__":
     final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
     print('Test ppl: ', final_ppl)
 
-    model_name = f"LSTM_VD_WT_NTAvSGD_PPL_{final_ppl:.2f}_LR_{lr}"
+    model_name = f"LSTM_WT_VD_NTAvSGD_PPL_{final_ppl:.2f}_LR_{lr}"
     # Save the results
     result_path=os.path.join("Results", model_name)
     os.makedirs(result_path, exist_ok=True)

@@ -1,0 +1,12 @@
+
+LSTM_VD_WT_NTAvSGD_PPL_104.22_LR_1.2000000000000002
+
+hid_size=500, 
+emb_size=500, 
+lr=1.2000000000000002, 
+clip=5, 
+n_epochs=100, 
+patience=0, 
+batch_train=64, 
+batch_dev_test=128, 
+test_ppl=104.22490641211944
