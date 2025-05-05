@@ -32,7 +32,7 @@ if __name__ == "__main__":
     dev_loader = DataLoader(dev_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
     test_loader = DataLoader(test_dataset, batch_size=64, collate_fn=partial(collate_fn, pad_token=lang.word2id["<pad>"]))
 ####################################################################################################################################################################
-    hid_size = 300
+    hid_size = 500
     emb_size = 500
     lr = 3
     clip = 5
@@ -44,7 +44,8 @@ if __name__ == "__main__":
     vocab_len = len(lang.word2id)
     
     #model = LM_LSTM_WT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-    model = LM_LSTM_VD(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    #model = LM_LSTM_VD(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+    model = LM_LSTM_VD_WT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
     model.apply(init_weights)
 
     optimizer = optim.SGD(model.parameters(), lr=lr)
@@ -115,7 +116,7 @@ if __name__ == "__main__":
     final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
     print('Test ppl: ', final_ppl)
 
-    model_name = f"LSTM_VD_NTAvSGD_PPL_{final_ppl:.2f}_LR_{lr}"
+    model_name = f"LSTM_VD_WT_NTAvSGD_PPL_{final_ppl:.2f}_LR_{lr}"
     # Save the results
     result_path=os.path.join("Results", model_name)
     os.makedirs(result_path, exist_ok=True)
