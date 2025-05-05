@@ -57,6 +57,6 @@ class LM_LSTM_DROPOUT(nn.Module):
         emb = self.embedding(input_sequence)
         drop1 = self.emb_dropout(emb)
         lstm_out, _ = self.lstm(drop1)
-        drop2 = self.dropout(lstm_out)
+        drop2 = self.out_dropout(lstm_out)
         output = self.output(drop2).permute(0,2,1)
         return output

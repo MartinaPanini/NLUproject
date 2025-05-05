@@ -1,0 +1,12 @@
+
+LSTM_SGD_PPL_137.49_LR_1
+
+hid_size=300, 
+emb_size=500, 
+lr=1, 
+clip=5, 
+n_epochs=100, 
+patience=0, 
+batch_train=64, 
+batch_dev_test=128, 
+test_ppl=137.4892008973809

@@ -34,8 +34,8 @@ if __name__ == "__main__":
 ####################################################################################################################################################################
     hid_size = 300
     emb_size = 500
-    #lrs = [0.001, 0.0001] # for AdamW
-    lrs = [1, 3] # for SGD
+    lrs = [0.001, 0.0001] # for AdamW
+    #lrs = [1, 3] # for SGD
     clip = 5
     n_epochs = 100
     patience = 5
@@ -47,11 +47,11 @@ if __name__ == "__main__":
         
         #model = LM_RNN(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
         #model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
-        model = LM_LSTM(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
+        model = LM_LSTM_DROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
         model.apply(init_weights)
 
-        optimizer = optim.SGD(model.parameters(), lr=lr)
-        #optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+        #optimizer = optim.SGD(model.parameters(), lr=lr)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
         criterion_train = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"])
         criterion_eval = nn.CrossEntropyLoss(ignore_index=lang.word2id["<pad>"], reduction='sum')
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    
         print('Test ppl: ', final_ppl)
 
-        model_name = f"LSTM_DROPOUT_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  # Placeholder for final PPL
+        model_name = f"LSTM_DROP_ADAMW_PPL_{final_ppl:.2f}_LR_{lr}"  # Placeholder for final PPL
         result_path=os.path.join("Results", model_name)
         os.makedirs(result_path, exist_ok=True)
 
@@ -111,5 +111,4 @@ if __name__ == "__main__":
         # To save the model
         path = os.path.join(result_path, f'{model_name}.pt')
         torch.save(model.state_dict(), path)
-        # model = LM_LSTM_DROPOUT(emb_size, hid_size, vocab_len, pad_index=lang.word2id["<pad>"]).to(device)
         # model.load_state_dict(torch.load(path))
