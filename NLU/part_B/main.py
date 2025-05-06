@@ -105,8 +105,8 @@ if __name__ == "__main__":
             results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, criterion_intents, model, lang, tokenizer)
             losses_dev.append(np.asarray(loss_dev).mean())
             f1 = results_dev['total']['f']
-            print(f"f1 {f1}\n")
-            print(f"best f1 {best_f1}")
+            #print(f"f1 {f1}\n")
+            #print(f"best f1 {best_f1}")
 
             if f1 > best_f1:
                 best_f1 = f1
