@@ -156,4 +156,12 @@ if __name__ == "__main__":
         file.close()
 
     
-   
+   # Save the model
+    model_path = os.path.join(result_path, f"model_{model_name}.pt")
+    torch.save(best_model.state_dict(), model_path)
+    print(f"Model saved to {model_path}")
+    
+    # Save the tokenizer
+    tokenizer_path = os.path.join(result_path, "tokenizer")
+    tokenizer.save_pretrained(tokenizer_path)
+    print(f"Tokenizer saved to {tokenizer_path}")
