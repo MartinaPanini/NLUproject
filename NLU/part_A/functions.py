@@ -7,11 +7,10 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
     loss_array = []
     for sample in data:
         optimizer.zero_grad() # Zeroing the gradient
-        slots, intent = model(sample['utterances'], sample['slots_len'])
-        loss_intent = criterion_intents(intent, sample['intents'])
-        loss_slot = criterion_slots(slots, sample['y_slots'])
-        loss = loss_intent + loss_slot # In joint training we sum the losses. 
-                                       # Is there another way to do that?
+        slots, intent = model(sample['utterances'], sample['slots_len']) # Forward pass to get predictions for slots and intents
+        loss_intent = criterion_intents(intent, sample['intents']) # Calculates the cross-entropy loss for intent classification
+        loss_slot = criterion_slots(slots, sample['y_slots']) # Calculates the cross-entropy loss for slot filling
+        loss = loss_intent + loss_slot # In joint training we sum the losses
         loss_array.append(loss.item())
         loss.backward() # Compute the gradient, deleting the computational graph
         # clip the gradient to avoid exploding gradients

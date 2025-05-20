@@ -16,7 +16,7 @@ def load_data(path):
     return dataset
 
 class Lang():
-    def __init__(self, words, intents, slots, cutoff=0):
+    def __init__(self, words, intents, slots, cutoff=0): 
         self.word2id = self.w2id(words, cutoff=cutoff, unk=True)
         self.slot2id = self.lab2id(slots)
         self.intent2id = self.lab2id(intents, pad=False)
@@ -24,7 +24,7 @@ class Lang():
         self.id2slot = {v:k for k, v in self.slot2id.items()}
         self.id2intent = {v:k for k, v in self.intent2id.items()}
         
-    def w2id(self, elements, cutoff=None, unk=True):
+    def w2id(self, elements, cutoff=None, unk=True): # Mapping words to IDs
         vocab = {'pad': 0}
         if unk:
             vocab['unk'] = len(vocab)
@@ -34,7 +34,7 @@ class Lang():
                 vocab[k] = len(vocab)
         return vocab
     
-    def lab2id(self, elements, pad=True):
+    def lab2id(self, elements, pad=True): # Mapping intents and slots to IDs
         vocab = {}
         if pad:
             vocab['pad'] = 0
@@ -67,7 +67,7 @@ class IntentsAndSlots (data.Dataset):
         utt = torch.Tensor(self.utt_ids[idx])
         slots = torch.Tensor(self.slot_ids[idx])
         intent = self.intent_ids[idx]
-        sample = {'utterance': utt, 'slots': slots, 'intent': intent}
+        sample = {'utterance': utt, 'slots': slots, 'intent': intent} # raw utterances, intents and slots
         return sample
     
     # Auxiliary methods

@@ -6,7 +6,7 @@ class ModelIAS(nn.Module):
 
     def __init__(self, hid_size, out_slot, out_int, emb_size, vocab_len, n_layer=1, pad_index=0, isDropout=False, isBidirectional=False, dropout=0.5):
         super(ModelIAS, self).__init__()
-        # hid_size = Hidden size
+        # hid_size = Hidden size, the number of features in the hidden state of the LSTM.
         # out_slot = number of slots (output size for slot filling)
         # out_int = number of intents (output size for intent class)
         # emb_size = word embedding size
@@ -14,7 +14,7 @@ class ModelIAS(nn.Module):
         self.isBidirectional = isBidirectional
         self.isDropout = isDropout
         
-        self.embedding = nn.Embedding(vocab_len, emb_size, padding_idx=pad_index)
+        self.embedding = nn.Embedding(vocab_len, emb_size, padding_idx=pad_index) # Converts input word IDs into embeddings (dense vectors)
         self.utt_encoder = nn.LSTM(emb_size, hid_size, n_layer, bidirectional=self.isBidirectional, batch_first=True)    
 
         if self.isDropout:
