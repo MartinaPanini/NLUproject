@@ -13,7 +13,6 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
     for sample in data:
 
         optimizer.zero_grad() # Zeroing the gradient
-        # print(sample['utterances'])
         slots, intent = model(sample['utterances'], sample["attentions"], sample["token_type_ids"])
         loss_intent = criterion_intents(intent, sample['intents'])
         loss_slot = criterion_slots(slots, sample['y_slots'])

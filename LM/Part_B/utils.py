@@ -57,7 +57,7 @@ def collate_fn(data, pad_token):
     new_item["number_tokens"] = sum(lengths)
     return new_item
 
-# Funzione per plottare le loss
+############ PLOTS ###########
 def plot_loss(sampled_epochs, losses_train, losses_dev, save_path, model_name):
     plt.figure()
     plt.plot(sampled_epochs, losses_train, label='Train Loss', marker='o')
@@ -70,7 +70,6 @@ def plot_loss(sampled_epochs, losses_train, losses_dev, save_path, model_name):
     plt.savefig(save_path)
     plt.close()
 
-# Funzione per plottare la Perplexity
 def plot_perplexity(sampled_epochs, perplexities, save_path, model_name):
     plt.figure()
     plt.plot(sampled_epochs, perplexities, label='Validation Perplexity', marker='o')

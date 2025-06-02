@@ -62,7 +62,7 @@ if __name__ == "__main__":
         best_ppl = math.inf
         best_model = None
         pbar = tqdm(range(1,n_epochs+1))
-        #If the PPL is too high try to change the learning rate
+
         for epoch in pbar:
             loss = train_loop(train_loader, optimizer, criterion_train, model, clip)    
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
                     patience -= 1
                     
                 if patience <= 0: # Early stopping with patience
-                    break # Not nice but it keeps the code clean
+                    break
 
         best_model.to(device)
         final_ppl,  _ = eval_loop(test_loader, criterion_eval, best_model)    

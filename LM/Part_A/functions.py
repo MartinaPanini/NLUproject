@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.utils.data as data
 import math
 
-# This class computes and stores our vocab 
+
 # Word to ids and ids to word
 class Lang():
     def __init__(self, corpus, special_tokens=[]):
@@ -29,9 +29,8 @@ class PennTreeBank (data.Dataset):
         self.target = []
         
         for sentence in corpus:
-            self.source.append(sentence.split()[0:-1]) # We get from the first token till the second-last token
-            self.target.append(sentence.split()[1:]) # We get from the second token till the last token
-            # See example in section 6.2
+            self.source.append(sentence.split()[0:-1]) 
+            self.target.append(sentence.split()[1:])
         
         self.source_ids = self.mapping_seq(self.source, lang)
         self.target_ids = self.mapping_seq(self.target, lang)
@@ -56,7 +55,7 @@ class PennTreeBank (data.Dataset):
                     tmp_seq.append(lang.word2id[x])
                 else:
                     print('OOV found!')
-                    print('You have to deal with that') # PennTreeBank doesn't have OOV but "Trust is good, control is better!"
+                    print('You have to deal with that') 
                     break
             res.append(tmp_seq)
         return res
