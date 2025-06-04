@@ -99,24 +99,17 @@ class IntentsAndSlots (data.Dataset):
             tmp_attention = []
             tmp_token_type_id = []
 
-            #tokenize word per word with bert_tokenizer
             for word, element in zip(sequence.split(), slot.split(' ')):
                 tmp_attention.append(1)
                 tmp_token_type_id.append(0)
 
-                #use bert tokenizer
-                word_tokens = tokenizer(word)
-                
-                #remove CLS and SEP tokens
-                word_tokens = word_tokens[1:-1]
+                word_tokens = tokenizer(word) # BERT
+                word_tokens = word_tokens[1:-1] # Remove tokens
                  
                 tmp_utt.extend(word_tokens["input_ids"])
-
-                #add true id to first word, others 'pad'
                 tmp_slot.extend([mapper_slot[element]] + [mapper_slot['pad']] * (len(word_tokens["input_ids"]) - 1))
 
-                # create attention mask 
-                for i in range(len(word_tokens["input_ids"])-1):
+                for i in range(len(word_tokens["input_ids"])-1): # Attention mask
                     tmp_attention.append(1)
                     tmp_token_type_id.append(0)
 
@@ -125,7 +118,6 @@ class IntentsAndSlots (data.Dataset):
             res_attention.append(tmp_attention)
             res_token_type_id.append(tmp_token_type_id)
 
-        
         return res_utterance, res_slots, res_attention, res_token_type_id
 
 def pad_sequences(sequences, pad_token='[pad]'):
@@ -142,32 +134,28 @@ def collate_fn(data):
         PAD_TOKEN = 0
         lengths = [len(seq) for seq in sequences]
         max_len = 1 if max(lengths)==0 else max(lengths)
-        # Pad token is zero in our case
-        # So we create a matrix full of PAD_TOKEN (i.e. 0) with the shape 
-        # batch_size X maximum length of a sequence
+
         padded_seqs = torch.LongTensor(len(sequences),max_len).fill_(PAD_TOKEN)
         for i, seq in enumerate(sequences):
             end = lengths[i]
-            padded_seqs[i, :end] = seq # copy each sequence into the matrix
+            padded_seqs[i, :end] = seq 
 
-        padded_seqs = padded_seqs.detach()  # remove these tensors from the computational graph
+        padded_seqs = padded_seqs.detach() 
         return padded_seqs, lengths
     
-
     # Sort data by seq lengths
     data.sort(key=lambda x: len(x['utterance']), reverse=True) 
     new_item = {}
     for key in data[0].keys():
         new_item[key] = [d[key] for d in data]
 
-    # just need one length for packed pad seq, since len(utt) == len(slots)
     src_utt, _ = merge(new_item['utterance'])
     y_slots, y_lengths = merge(new_item["slots"])
     intent = torch.LongTensor(new_item["intent"])
     attention, _ = merge(new_item["attention"])
     token_type_id, _ = merge(new_item["token_type_id"])
     
-    src_utt = src_utt.to(device) # load the Tensor on our selected device
+    src_utt = src_utt.to(device) 
     y_slots = y_slots.to(device)
     intent = intent.to(device)
     y_lengths = torch.LongTensor(y_lengths).to(device)
