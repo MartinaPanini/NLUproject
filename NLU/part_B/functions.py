@@ -25,7 +25,6 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
 
     return loss_array
 
-
 # Function to evaluate the model
 def eval_loop(data, criterion_slots, criterion_intents, model, lang, tokenizer):
     model.eval()
@@ -36,7 +35,7 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang, tokenizer):
 
     ref_slots = []
     hyp_slots = []
-    ref_slots_no_pad = [] #version of ref_slots without pad
+    ref_slots_no_pad = [] 
     hyp_slots_no_pad = []
 
     with torch.no_grad():
@@ -46,14 +45,11 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang, tokenizer):
             loss_slot = criterion_slots(slots, sample['y_slots'])
             loss = loss_intent + loss_slot 
             loss_array.append(loss.item())
-
-            #intent inference
-            #get the highest probable class
+            # intent inference
             out_intent = [lang.id2intent[x] for x in torch.argmax(intents, dim=1).tolist()] 
             gt_intents = [lang.id2intent[x] for x in sample['intents'].tolist()]
             ref_intents.extend(gt_intents)
             hyp_intents.extend(out_intent)
-
             # slot inference
             output_slots = torch.argmax(slots,dim=1)
             for id_seq, seq in enumerate(output_slots):
@@ -74,10 +70,7 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang, tokenizer):
                 for id_el, elem in enumerate(to_decode):
                     tmp_seq.append((utterance[id_el], lang.id2slot[elem]))
                 hyp_slots.append(tmp_seq)
-        
 
-
-        #remove pad tokens from reference and hypothesis for evaluation
         for refs, hyps in zip(ref_slots, hyp_slots):
             tmp_ref = []
             tmp_hyp = []
@@ -92,7 +85,6 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang, tokenizer):
     try:            
         results = evaluate(ref_slots_no_pad, hyp_slots_no_pad)
     except Exception as ex:
-        # Sometimes the model predicts a class that is not in REF
         print("Warning:", ex)
         ref_s = set([x[1] for x in ref_slots])
         hyp_s = set([x[1] for x in hyp_slots])
